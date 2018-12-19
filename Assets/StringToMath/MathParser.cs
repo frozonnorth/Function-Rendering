@@ -1,4 +1,9 @@
-﻿using System;
+﻿/*
+ * Main Source:https://www.codeproject.com/Tips/381509/%2FTips%2F381509%2FMath-Parser-NET-Csharp
+ * Need to be extended to include more math functions
+ */
+
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Text;
