@@ -456,6 +456,9 @@ public class ParametricMesh : MonoBehaviour
 
                                 " + inputcode + @"
 
+                                //this little code reverses the Z
+                                z*=-1;
+
                                 vertices.Add(new Vector3(x, y, z));
 
                                 if (varUsed == 3)
@@ -507,7 +510,6 @@ public class ParametricMesh : MonoBehaviour
                                             indices.Add(vertices.Count - 1 - 1 - sampleresolution_U);
                                             indices.Add(vertices.Count - 1 - sampleresolution_U);
                                         }
-                                       
                                     }
                                     if (k > 0 && i == 0 && j > 0) //left
                                     {
@@ -532,7 +534,6 @@ public class ParametricMesh : MonoBehaviour
                                             indices.Add(vertices.Count - 1 - sampleresolution_U - sampleresolution_U * sampleresolution_U);
                                             indices.Add(vertices.Count - 1 - sampleresolution_U);
                                         }
-                                       
                                     }
                                     if (k > 0 && i == sampleresolution_U - 1 && j > 0) //right
                                     {

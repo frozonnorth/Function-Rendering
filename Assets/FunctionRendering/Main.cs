@@ -796,10 +796,10 @@ public class Main : MonoBehaviour
         rend.material.SetColor("_Color", new Color(diffuse_R, diffuse_G, diffuse_B, transparencyvalue));
 
         //set specular color
-        rend.material.SetColor("_SpecColor", new Color(specular_R, specular_G, specular_B));
+        rend.material.SetColor("_SpecColor", new Color(specular_R, specular_G, specular_B, 1));
 
         //set shininess
-        rend.material.SetFloat("_Shininess", shininess);
+        rend.material.SetFloat("_Glossiness", shininess);
 
         //set wireframe toggle
         parametricMesh.iswireframe = tab.IsWireframe;
