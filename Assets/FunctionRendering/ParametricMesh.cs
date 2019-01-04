@@ -691,9 +691,12 @@ public class ParametricMesh : MonoBehaviour
                     mesh.RecalculateBounds();
                     return mesh;
                 }
+                void OnDestroy()
+                {
+                    GetComponent<MeshFilter>().mesh = null;
+                }
             }"
         );
-
 
         //get the assembly at runtime
         var runtimeType = assembly.GetType("CompliedMesh");//this name have to match the name of the compiling code above
@@ -885,9 +888,9 @@ public class ParametricMesh : MonoBehaviour
                         Destroy(go);
                     }
                 }
-}
+            }
         ");
-
+        
         //get the assembly at runtime
         var runtimeType = assembly.GetType("CompliedMesh");//this name have to match the name of the compiling code above
         //get the method ("Setup") and create a delegate so that we can execute it to tell the script to start

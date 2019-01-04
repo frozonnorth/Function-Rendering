@@ -208,6 +208,7 @@ public class Main : MonoBehaviour
         newtab.transform.SetParent(ObjectTabContainerGO.transform, false);
         newtab.SetText(name);
         newtab.gameObject.name = name;
+        newtab.ObjectName = name;
         newtab.AddButtonOnClickEvent();
         return newtab;
     }
@@ -216,56 +217,95 @@ public class Main : MonoBehaviour
         string name = file.Name.Remove(file.Name.Length - SaveFileExtention.Length);
         currentObjectTab = CreateNewTab(name);
 
-        #region Load saved file data into tab
+        #region Load saved file data after clicking on the file into tab
         StreamReader sreader = file.OpenText();
         string line = sreader.ReadLine();
+        int linecounter = 0;
         while (line != null)
         {
-            if (line.Contains("#"))
+            try
             {
-
-            }
-            //find "parameters"
-            else if (line.Contains("parameters"))
-            {
-                line = line.Replace("parameters", "");
-                currentObjectTab.ParameterDomain = line.Trim();
-            }
-
-            //find "resolution"
-            else if (line.Contains("resolution"))
-            {
-                line = line.Replace("resolution", "");
-                currentObjectTab.Resolution = line.Trim();
-            }
-
-            //find "definition"
-            else if (line.Contains("definition"))
-            {
-                line = line.Replace("definition", "");
-                int paraentesiscount = line.Length - line.Replace("\"", "").Length;
-                currentObjectTab.Code = line.Trim();
-                while (line != "")
+                if (line.Contains("#"))
                 {
-                    if (paraentesiscount >= 2)
-                    {
-                        break;
-                    }
-                    line = sreader.ReadLine();
-                    currentObjectTab.Code += '\n' + line.Trim();
-                    paraentesiscount += line.Length - line.Replace("\"", "").Length;
+                    //ignore the line that has #, which is comment,
+                    //User can comment the save file using #
                 }
-                currentObjectTab.Code = currentObjectTab.Code.Replace("\"", "");
+
+                //find mode
+                else if (line.Contains("mode"))
+                {
+                    line = line.Replace("mode", "");
+                    currentObjectTab.ObjectMode = int.Parse(line.Trim());
+                }
+
+                //find "parameters"
+                else if (line.Contains("parameters"))
+                {
+                    line = line.Replace("parameters", "");
+                    currentObjectTab.ParameterDomain = line.Trim();
+                }
+
+                //find "resolution"
+                else if (line.Contains("resolution"))
+                {
+                    line = line.Replace("resolution", "");
+                    currentObjectTab.Resolution = line.Trim();
+                }
+
+                //find "definition"
+                else if (line.Contains("definition"))
+                {
+                    line = line.Replace("definition", "");
+                    int paraentesiscount = line.Length - line.Replace("\"", "").Length;
+                    currentObjectTab.Code = line.Trim();
+                    while (line != "")
+                    {
+                        if (paraentesiscount >= 2)
+                        {
+                            break;
+                        }
+                        line = sreader.ReadLine();
+                        currentObjectTab.Code += '\n' + line.Trim();
+                        paraentesiscount += line.Length - line.Replace("\"", "").Length;
+                    }
+                    currentObjectTab.Code = currentObjectTab.Code.Replace("\"", "");
+                }
+
+                //find "bounding box size"
+                else if (line.Contains("bboxSize"))
+                {
+                    line = line.Replace("bboxSize", "");
+                    currentObjectTab.MarchingBoundingBoxSize = line.Trim();
+                }
+
+                //find "bounding box center"
+                else if (line.Contains("bboxCenter"))
+                {
+                    line = line.Replace("bboxCenter", "");
+                    currentObjectTab.MarchingBoundingBoxCenter = line.Trim();
+                }
+
+                //find "bounding box resolution"
+                else if (line.Contains("bboxResolution"))
+                {
+                    line = line.Replace("bboxResolution", "");
+                    currentObjectTab.BoundingBoxResolution = line.Trim();
+                }
+
+                line = sreader.ReadLine(); // next line
+
+                linecounter++;
             }
-            line = sreader.ReadLine(); // next line
+            catch
+            {
+                DisplayMessage("Error Loading File:"+ file.FullName + "at line:"+ linecounter);
+            }
         }
         sreader.Close();
         #endregion
 
-        ParameterResolutionInputField.text = currentObjectTab.Resolution;
-        ParameterDomainInputField.text = currentObjectTab.ParameterDomain;
-        CodeInputField.text = currentObjectTab.Code;
-        ObjectNameInputField.text = name;
+        //after loading, we want to change the current input fields to the reflect loaded data
+        CopyTabInfoToInputField(currentObjectTab);
 
         CreateParametricMeshFromTab(currentObjectTab);
     }
@@ -305,10 +345,7 @@ public class Main : MonoBehaviour
     {
         currentObjectTab = tab;
 
-        ParameterDomainInputField.text = currentObjectTab.ParameterDomain;
-        ParameterResolutionInputField.text = currentObjectTab.Resolution;
-        CodeInputField.text = currentObjectTab.Code;
-        ObjectNameInputField.text = currentObjectTab.GetText();
+        CopyTabInfoToInputField(currentObjectTab);
 
         CreateParametricMeshFromTab(currentObjectTab);
     }
@@ -320,11 +357,18 @@ public class Main : MonoBehaviour
             Destroy(currentObjectTab.gameObject);
             currentObjectTab = null;
 
-            ParameterResolutionInputField.text = "";
-            ParameterDomainInputField.text = "";
+            ObjectNameInputField.text = "New Object";
+            ModeInputField.value = 0;
+            OnModeChange(ModeInputField.value);
+
             CodeInputField.text = "";
 
-            CreateParametricMeshFromTab(currentObjectTab);
+            ParameterDomainInputField.text = "[0 1 0 1 0 1]";
+            ParameterResolutionInputField.text = "[75 75 75]";
+
+            BoundingBoxSizeInputField.text = "[100 100 100]";
+            BoundingBoxCenterInputField.text = "[0 0 0]";
+            BoundingBoxResolutionInputField.text = "[0 1 0 1 0 1]";
         }
         //if we trying to close the current selected tab
         else if (currentObjectTab == tab)
@@ -336,15 +380,14 @@ public class Main : MonoBehaviour
             if (index == currentObjectTab.transform.parent.childCount - 1)
             {
                 //Get the previous tab
-                Tab neightbourtab = currentObjectTab.transform.parent.GetChild(index - 1).gameObject.GetComponent<Tab>();
+                Tab neighbourtab = currentObjectTab.transform.parent.GetChild(index - 1).gameObject.GetComponent<Tab>();
                 //Destory current tab
                 Destroy(currentObjectTab.gameObject);
-
-                currentObjectTab = neightbourtab;
-                ParameterResolutionInputField.text = currentObjectTab.Resolution;
-                ParameterDomainInputField.text = currentObjectTab.ParameterDomain;
-                CodeInputField.text = currentObjectTab.Code;
-
+                //Change to neighbourtab
+                currentObjectTab = neighbourtab;
+                //copy tab info to inputfield
+                CopyTabInfoToInputField(currentObjectTab);
+                //generate mesh from tab
                 CreateParametricMeshFromTab(currentObjectTab);
             }
             else
@@ -353,18 +396,18 @@ public class Main : MonoBehaviour
                 Tab neightbourtab = currentObjectTab.transform.parent.GetChild(index + 1).gameObject.GetComponent<Tab>();
                 //Destory current tab
                 Destroy(currentObjectTab.gameObject);
-
+                //Change to neighbourtab
                 currentObjectTab = neightbourtab;
-                ParameterResolutionInputField.text = currentObjectTab.Resolution;
-                ParameterDomainInputField.text = currentObjectTab.ParameterDomain;
-                CodeInputField.text = currentObjectTab.Code;
-
+                //copy tab info to inputfield
+                CopyTabInfoToInputField(currentObjectTab);
+                //generate mesh from tab
                 CreateParametricMeshFromTab(currentObjectTab);
             }
         }
         // if we trying to close a tab that is not selected
         else
         {
+            //Just destory only
             Destroy(tab.gameObject);
         }
     }
@@ -491,7 +534,7 @@ public class Main : MonoBehaviour
             currentObjectTab = CreateNewTab();
         }
 
-        CopyAllObjectInfoToTab(currentObjectTab);
+        CopyAllInputFieldInfoToTab(currentObjectTab);
 
         CreateParametricMeshFromTab(currentObjectTab);
 
@@ -520,14 +563,37 @@ public class Main : MonoBehaviour
             swriter = file.CreateText();
         }
 
-        swriter.WriteLine
-        (
-            "definition \"" + CodeInputField.text.Replace("\n", "\n\t\t\t") + "\"\n" +
-            "parameters " + ParameterDomainInputField.text + "\n" +
-            "resolution " + ParameterResolutionInputField.text
-        );
+        int mode = ModeInputField.value;
+        //0 - explicit , 1 - implicit
+        if (mode == 0)
+        {
+            swriter.WriteLine
+            (
+                "mode " + ModeInputField.value + "\n" +
+                "definition \"" + CodeInputField.text.Replace("\n", "\n\t\t\t") + "\"\n" +
+                "parameters " + ParameterDomainInputField.text + "\n" +
+                "resolution " + ParameterResolutionInputField.text
+            );
+        }
+        else if (mode == 1)
+        {
+            swriter.WriteLine
+            (
+                "mode " + ModeInputField.value + "\n" +
+                "definition \"" + CodeInputField.text.Replace("\n", "\n\t\t\t") + "\"\n" +
+                "bboxSize " + BoundingBoxSizeInputField.text + "\n" +
+                "bboxCenter " + BoundingBoxCenterInputField.text + "\n" +
+                "bboxResolution " + BoundingBoxResolutionInputField.text
+            );
+        }
+
         swriter.Close();
         #endregion
+
+        if(WorkingProjectPath.text == "")
+        {
+            WorkingProjectPath.text = file.FullName.Substring(0,file.FullName.Length - file.Name.Length);
+        }
 
         //update project directory after saving is done
         UpdateDirectory(WorkingProjectPath.text);
@@ -1000,7 +1066,7 @@ public class Main : MonoBehaviour
         }
         parametricMesh.StartDrawing();
     }
-    void CopyAllObjectInfoToTab(Tab tabtocopyto)
+    void CopyAllInputFieldInfoToTab(Tab tabtocopyto)
     {
         tabtocopyto.ObjectMode = ModeInputField.value;
 
@@ -1024,6 +1090,22 @@ public class Main : MonoBehaviour
         tabtocopyto.Shininess = ShininessInputField.text;
 
         tabtocopyto.IsWireframe = WireframeToggle.isOn;
+    }
+    void CopyTabInfoToInputField(Tab tabtocopyfrom)
+    {
+        ModeInputField.value = tabtocopyfrom.ObjectMode;
+        OnModeChange(ModeInputField.value);
+
+        CodeInputField.text = tabtocopyfrom.Code;
+
+        ParameterResolutionInputField.text = tabtocopyfrom.Resolution;
+        ParameterDomainInputField.text = tabtocopyfrom.ParameterDomain;
+
+        BoundingBoxSizeInputField.text = tabtocopyfrom.MarchingBoundingBoxSize;
+        BoundingBoxCenterInputField.text = tabtocopyfrom.MarchingBoundingBoxCenter;
+        BoundingBoxSizeInputField.text = tabtocopyfrom.BoundingBoxResolution;
+
+        ObjectNameInputField.text = tabtocopyfrom.ObjectName;
     }
     void DisplayMessage(string message)
     {
