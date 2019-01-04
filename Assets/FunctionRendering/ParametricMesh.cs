@@ -18,6 +18,10 @@ using Microsoft.CSharp;
 /// </summary>
 public class ParametricMesh : MonoBehaviour
 {
+    public int mode = 0;
+    public bool iswireframe = false;
+
+    //explicit
     public int sampleresolution_U = 1;
     public int sampleresolution_V = 1;
     public int sampleresolution_W = 1;
@@ -31,7 +35,10 @@ public class ParametricMesh : MonoBehaviour
     public float wMinDomain = 0;
     public float wMaxDomain = 1;
 
-    public bool iswireframe = false;
+    //implicit
+    public Vector3 MarchingBoundingBoxSize = new Vector3(100, 100, 100);
+    public Vector3 MarchingBoundingBoxCenter = new Vector3(0, 0, 0);
+    public Vector3 BoundingBoxResolution = new Vector3(100, 100, 100);
 
     //private varaible but serialized to make it appear in the unity inspector for easy debugging
     [SerializeField]
@@ -73,13 +80,21 @@ public class ParametricMesh : MonoBehaviour
 
     public void StartDrawing()
     {
-        if(meshgenerationType == GenerationType.RunTimeCompile)
+        //0 - explicit , 1 - implicit
+        if (mode == 0)
         {
-            CompileInputCodeAndAttachToGO(inputCode);
+            if (meshgenerationType == GenerationType.RunTimeCompile)
+            {
+                CompileExplicitCodeAndAttachToGO(inputCode);
+            }
+            else if (meshgenerationType == GenerationType.StringMathParser)
+            {
+                DrawMeshFromMathParser();
+            }
         }
-        else if (meshgenerationType == GenerationType.StringMathParser)
+        else if (mode == 1)
         {
-            DrawMeshFromMathParser();
+            CompileImplicitCodeAndAttachToGO(inputCode);
         }
     }
 
@@ -280,7 +295,7 @@ public class ParametricMesh : MonoBehaviour
     #endregion
 
     //huge function that compiles the input code,attach the new compiled code to the gameobject and the code draws and updates the mesh
-    void CompileInputCodeAndAttachToGO(string inputcode)
+    void CompileExplicitCodeAndAttachToGO(string inputcode)
     {
         bool isusingU = false;
         bool isusingV = false;
@@ -331,9 +346,12 @@ public class ParametricMesh : MonoBehaviour
                 { "exp", "Mathf.Exp" },
 
                 { "pi", "Mathf.PI" },
+
+                { "min", "Mathf.Min" },
+                { "max", "Mathf.Max" },
             };
 
-        //replace the 
+        //replace
         foreach (KeyValuePair<string, string> entry in replacestrings)
         {
             inputcode = Regex.Replace(inputcode, "([^a-zA-Z0-9]|[\\s])" + entry.Key + "([^a-zA-Z0-9]|[\\s])", "$1" + entry.Value + "$2");
@@ -408,13 +426,6 @@ public class ParametricMesh : MonoBehaviour
                     a.sampleresolution_V = sampleresolution_V;
                     a.sampleresolution_W = sampleresolution_W;
                     a.iswireframe = iswireframe;
-
-                    go.GetComponent<MeshFilter>().mesh = CreateParametricObject(
-                                                        varUsed, 0,
-                                                        uMinDomain, uMaxDomain,
-                                                        vMinDomain, vMaxDomain,
-                                                        wMinDomain, wMaxDomain,
-                                                        sampleresolution_U,  sampleresolution_V,  sampleresolution_W,iswireframe);
                 }
 
                 public static Mesh CreateParametricObject
@@ -703,6 +714,194 @@ public class ParametricMesh : MonoBehaviour
     }
     delegate void Func<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13>(T1 p1, T2 p2, T3 p3, T4 p4, T5 p5, T6 p6, T7 p7, T8 p8, T9 p9, T10 p10, T11 p11, T12 p12, T13 p13);
 
+    void CompileImplicitCodeAndAttachToGO(string inputcode)
+    {
+        bool isusingT = false;
+        // check the string for time "t" usage
+        if (Regex.IsMatch(inputcode, "([^a-zA-Z0-9]|[\\s])t([^a-zA-Z0-9]|[\\s])"))
+        {
+            isusingT = true;
+        }
+
+        #region string formatting
+        //declare a set of special words to be replaced with the unity math version
+        Dictionary<string, string> replacestrings =
+            new Dictionary<string, string>
+            {
+                { "cos", "Mathf.Cos" },
+                { "sin", "Mathf.Sin" },
+                { "tan", "Mathf.Tan" },
+
+                { "acos", "Mathf.Acos" },
+                { "asin", "Mathf.Asin" },
+                { "atan", "Mathf.Atan" },
+
+                { "abs", "Mathf.Abs" },
+                { "sqrt", "Mathf.Sqrt" },
+                { "pow", "Mathf.Pow" },
+
+                { "floor", "Mathf.Floor" },
+                { "ceil", "Mathf.Ceil" },
+                { "log", "Mathf.Log" },
+                { "exp", "Mathf.Exp" },
+
+                { "pi", "Mathf.PI" },
+
+                { "min", "Mathf.Min" },
+                { "max", "Mathf.Max" },
+            };
+
+        //replace
+        foreach (KeyValuePair<string, string> entry in replacestrings)
+        {
+            inputcode = Regex.Replace(inputcode, "([^a-zA-Z0-9]|[\\s])" + entry.Key + "([^a-zA-Z0-9]|[\\s])", "$1" + entry.Value + "$2");
+        }
+        #endregion
+
+        var assembly = Compile(@"
+            using System.Collections.Generic;
+            using UnityEngine;
+
+            public class CompliedMesh : MonoBehaviour
+            {
+                public float t = 0f;
+                public bool hastime = false;
+
+                Material material;
+                List<GameObject> meshes = new List<GameObject>();
+                Vector3 MarchingBoundingBoxSize = new Vector3(100, 100, 100);
+                Vector3 MarchingBoundingBoxCenter = new Vector3(0, 0, 0);
+                Vector3 BoundingBoxResolution = new Vector3(100, 100, 100);
+                int vertsPerGO = 24000;//must be divisible by 3, ie 3 verts == 1 triangle
+
+                MarchingCubes marchingCube = new MarchingCubes();
+
+                //define the function here
+                float samplingfunction(Vector3 position)
+                {
+                    float x = position.x;
+                    float y = position.y;
+                    float z = position.z;
+
+                    //using >= 0
+                    return " + inputcode + @"
+                    //return ((4.9f*t) * (4.9f*t) - x * x - y * y - z * z);
+
+                }
+
+                public static void Setup(GameObject go, Material material,
+                    bool hastime,
+                    Vector3 MarchingBoundingBoxSize,
+                    Vector3 MarchingBoundingBoxCenter,
+                    Vector3 BoundingBoxResolution,
+                    int vertsPerGO)
+                {
+                    CompliedMesh a = go.AddComponent<CompliedMesh>();
+                    a.material = material;
+                    a.hastime = hastime;
+                    a.MarchingBoundingBoxSize = MarchingBoundingBoxSize;
+                    a.MarchingBoundingBoxCenter = MarchingBoundingBoxCenter;
+                    a.BoundingBoxResolution = BoundingBoxResolution;
+                    a.vertsPerGO = vertsPerGO;//must be divisible by 3, ie 3 verts == 1 triangle
+                }
+                void Start()
+                {
+                    marchingCube.sampleProc = samplingfunction;//function goes here
+                    marchingCube.interpolate = true;
+
+                    GenerateMesh();
+                }
+
+                void Update()
+                {
+                    if (hastime)
+                    {
+                        t += Time.deltaTime;
+                        if (t > 1) t = 0;
+                        GenerateMesh();
+                    }
+                }
+                void GenerateMesh()
+                {
+                    marchingCube.Reset();
+                    marchingCube.MarchChunk(MarchingBoundingBoxCenter, (int)BoundingBoxResolution.x, MarchingBoundingBoxSize.x / BoundingBoxResolution.x);
+
+                    IList<Vector3> verts = marchingCube.GetVertices();
+                    IList<int> indices = marchingCube.GetIndices();
+
+                    //A mesh in unity can only be made up of 65000 verts.
+                    //Need to split the verts between multiple meshes.
+                    int maxVertsPerMesh = vertsPerGO; //must be divisible by 3, ie 3 verts == 1 triangle
+                    int numMeshes = verts.Count / maxVertsPerMesh + 1;
+
+                    if(meshes.Count > numMeshes)
+                    {
+                        meshes.RemoveRange(meshes.Count - numMeshes - 1, meshes.Count - numMeshes);
+                    }
+                    for (int i = 0; i < numMeshes; i++)
+                    {
+                        List<Vector3> splitVerts = new List<Vector3>();
+                        List<int> splitIndices = new List<int>();
+
+                        for (int j = 0; j < maxVertsPerMesh; j++)
+                        {
+                            int idx = i * maxVertsPerMesh + j;
+
+                            if (idx < verts.Count)
+                            {
+                                splitVerts.Add(verts[idx]);
+                                splitIndices.Add(j);
+                            }
+                        }
+
+                        if (splitVerts.Count == 0) continue;
+
+                        Mesh mesh = new Mesh();
+                        mesh.SetVertices(splitVerts);
+                        mesh.SetTriangles(splitIndices, 0);
+                        mesh.RecalculateBounds();
+                        mesh.RecalculateNormals();
+
+                        if (meshes.Count <= i)
+                        {
+                            GameObject go = new GameObject();
+                            go.transform.parent = transform;
+                            go.AddComponent<MeshFilter>();
+                            go.AddComponent<MeshRenderer>();
+                            go.GetComponent<Renderer>().material = material;
+                            go.GetComponent<MeshFilter>().mesh = mesh;
+                            meshes.Add(go);
+                        }
+                        else
+                        {
+                            meshes[i].GetComponent<MeshFilter>().mesh = mesh;
+                        }
+                    }
+                }
+                void OnDestroy()
+                {
+                    foreach (GameObject go in meshes)
+                    {
+                        Destroy(go);
+                    }
+                }
+}
+        ");
+
+        //get the assembly at runtime
+        var runtimeType = assembly.GetType("CompliedMesh");//this name have to match the name of the compiling code above
+        //get the method ("Setup") and create a delegate so that we can execute it to tell the script to start
+        var method = runtimeType.GetMethod("Setup");
+
+        var del = (Func<GameObject, Material, bool, Vector3, Vector3, Vector3, int>)
+                      Delegate.CreateDelegate(
+                          typeof(Func<GameObject, Material, bool, Vector3, Vector3, Vector3, int>),
+                          method);
+
+        del.Invoke(gameObject, GetComponent<MeshRenderer>().material, isusingT, MarchingBoundingBoxSize, MarchingBoundingBoxCenter, BoundingBoxResolution,3000); //must be divisible by 3, ie 3 verts == 1 triangle
+        MeshGenerated = true;
+    }
+    delegate void Func<T1, T2, T3, T4, T5, T6, T7>(T1 p1, T2 p2, T3 p3, T4 p4, T5 p5, T6 p6, T7 p7);
 
     static Assembly Compile(string source)
     {

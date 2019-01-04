@@ -4,10 +4,17 @@ using UnityEngine.UI;
 //The Tab class just keep track of different object information
 public class Tab : MonoBehaviour
 {
+    public int ObjectMode;
     public string ObjectName;
 
+    //explicit
     public string ParameterDomain;
     public string Resolution;
+
+    //implicit
+    public string MarchingBoundingBoxSize;
+    public string MarchingBoundingBoxCenter;
+    public string BoundingBoxResolution;
 
     public string Code;
 
@@ -18,11 +25,19 @@ public class Tab : MonoBehaviour
 
     public bool IsWireframe;
 
-    public Tab(string ObjectName,string ParameterDomain,string Resolution
-        ,string Code,string DiffuseColor,string SpecularColor,string Transparency,string Shininess,
+    public Tab(int ObjectMode, string ObjectName,
+        string ParameterDomain,string Resolution,
+        string MarchingBoundingBoxSize, string MarchingBoundingBoxCenter, string BoundingBoxResolution,
+        string Code,string DiffuseColor,string SpecularColor,string Transparency,string Shininess,
         bool IsWireframe)
     {
+        this.ObjectMode = ObjectMode;
         this.ObjectName = ObjectName;
+
+        this.MarchingBoundingBoxSize = MarchingBoundingBoxSize;
+        this.MarchingBoundingBoxCenter = MarchingBoundingBoxCenter;
+        this.BoundingBoxResolution = BoundingBoxResolution;
+
         this.ParameterDomain = ParameterDomain;
         this.Resolution = Resolution;
 

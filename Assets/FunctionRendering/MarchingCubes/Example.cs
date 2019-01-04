@@ -17,18 +17,8 @@ public class Example : MonoBehaviour
         float y = position.y;
         float z = position.z;
 
-        return samplingfunction(x, y, z);
-    }
-
-
-    float samplingfunction(float x, float y, float z)
-    {
         //using >= 0
-        if ((49f * 49f) - (x * x) - (y * y) - (z * z) >= 0)
-        {
-            return 0.5f;
-        }
-        return 0;
+        return (49f * 49f - x * x - y * y - z * z);
     }
     #endregion
 

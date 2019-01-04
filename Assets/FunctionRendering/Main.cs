@@ -10,11 +10,22 @@ using System;
 
 public class Main : MonoBehaviour
 {
+    public Dropdown ModeInputField;
+
     #region Main Input Fields
     public InputField ObjectNameInputField;
+    public InputField CodeInputField;
+    #endregion
+
+    #region Explicit Input Fields
     public InputField ParameterDomainInputField;
     public InputField ParameterResolutionInputField;
-    public InputField CodeInputField;
+    #endregion
+
+    #region Implicit Input Fields
+    public InputField BoundingBoxSizeInputField;
+    public InputField BoundingBoxCenterInputField;
+    public InputField BoundingBoxResolutionInputField;
     #endregion
 
     #region Extra Inputs Fields
@@ -260,71 +271,36 @@ public class Main : MonoBehaviour
     }
     #endregion
 
-    #region Run/Save/Load Button Clicks
-    public void OnRunClick()
+    #region ModeDropdown Selection Event
+    public void OnModeChange(int mode)
     {
-        if (currentObjectTab == null)
+        //0 = explicit , 1= implicit
+        if (mode == 0)
         {
-            currentObjectTab = CreateNewTab();
+            //Enable explict input fields
+            ParameterDomainInputField.transform.parent.gameObject.SetActive(true);
+            ParameterResolutionInputField.transform.parent.gameObject.SetActive(true);
+
+            //Disable implicit input fields
+            BoundingBoxSizeInputField.transform.parent.gameObject.SetActive(false);
+            BoundingBoxCenterInputField.transform.parent.gameObject.SetActive(false);
+            BoundingBoxResolutionInputField.transform.parent.gameObject.SetActive(false);
         }
-
-        CopyAllObjectInfoToTab(currentObjectTab);
-
-        CreateParametricMeshFromTab(currentObjectTab);
-
-        viewcamera.SetTarget(currentObject);
-    }
-    public void OnSaveClick()
-    {
-        //open file browser and ask user to select the save path
-        #if UNITY_STANDALONE_WIN
-        string path = StandaloneFileBrowser.SaveFilePanel("Save File", WorkingProjectPath.text, ObjectNameInputField.text, SaveFileExtention.TrimStart('.'));
-        if (path == "") return;
-        FileInfo file = new FileInfo(path);
-        #elif UNITY_ANDROID
-        FileInfo file = new FileInfo(Application.persistentDataPath + "/" + ObjectnameInput.text + SaveFileExtention);
-        #endif
-
-        #region write data
-        StreamWriter swriter;
-        if (!file.Exists)
+        else if (mode == 1)
         {
-            swriter = file.CreateText();
+            //Enable explict input fields
+            ParameterDomainInputField.transform.parent.gameObject.SetActive(false);
+            ParameterResolutionInputField.transform.parent.gameObject.SetActive(false);
+
+            //Disable implicit input fields
+            BoundingBoxSizeInputField.transform.parent.gameObject.SetActive(true);
+            BoundingBoxCenterInputField.transform.parent.gameObject.SetActive(true);
+            BoundingBoxResolutionInputField.transform.parent.gameObject.SetActive(true);
         }
-        else
-        {
-            file.Delete();
-            swriter = file.CreateText();
-        }
-
-        swriter.WriteLine
-        (
-            "definition \"" + CodeInputField.text.Replace("\n", "\n\t\t\t") + "\"\n" +
-            "parameters " + ParameterDomainInputField.text + "\n" +
-            "resolution " + ParameterResolutionInputField.text
-        );
-        swriter.Close();
-        #endregion
-
-        //update project directory after saving is done
-        UpdateDirectory(WorkingProjectPath.text);
-    }
-    public void OnLoadClick()
-    {
-        string[] paths;
-        #if UNITY_STANDALONE_WIN
-        paths = StandaloneFileBrowser.OpenFilePanel("Select File", WorkingProjectPath.text, SaveFileExtention.TrimStart('.'), false);
-        if (paths.Length == 0) return;
-        #elif UNITY_ANDROID
-        paths = new string[] { Application.persistentDataPath + "/" + ObjectnameInput.text + SaveFileExtention };
-        #endif
-
-        FileInfo file = new FileInfo(paths[0]);
-       
-        AddTab(file);
     }
     #endregion
 
+    #region Tab Click and Tab Close Button Click event
     public void OnTabClick(Tab tab)
     {
         currentObjectTab = tab;
@@ -392,7 +368,9 @@ public class Main : MonoBehaviour
             Destroy(tab.gameObject);
         }
     }
+    #endregion
 
+    #region Extra Input Fields On Change Event (only for user input validation)
     public void OnDiffuseColorChange()
     {
         //Format checking and format forcing
@@ -503,7 +481,73 @@ public class Main : MonoBehaviour
             return;
         }
     }
-    
+    #endregion
+
+    #region Run/Save/Load Button Clicks
+    public void OnRunClick()
+    {
+        if (currentObjectTab == null)
+        {
+            currentObjectTab = CreateNewTab();
+        }
+
+        CopyAllObjectInfoToTab(currentObjectTab);
+
+        CreateParametricMeshFromTab(currentObjectTab);
+
+        viewcamera.SetTarget(currentObject);
+    }
+    public void OnSaveClick()
+    {
+        //open file browser and ask user to select the save path
+        #if UNITY_STANDALONE_WIN
+        string path = StandaloneFileBrowser.SaveFilePanel("Save File", WorkingProjectPath.text, ObjectNameInputField.text, SaveFileExtention.TrimStart('.'));
+        if (path == "") return;
+        FileInfo file = new FileInfo(path);
+        #elif UNITY_ANDROID
+        FileInfo file = new FileInfo(Application.persistentDataPath + "/" + ObjectnameInput.text + SaveFileExtention);
+        #endif
+
+        #region write data
+        StreamWriter swriter;
+        if (!file.Exists)
+        {
+            swriter = file.CreateText();
+        }
+        else
+        {
+            file.Delete();
+            swriter = file.CreateText();
+        }
+
+        swriter.WriteLine
+        (
+            "definition \"" + CodeInputField.text.Replace("\n", "\n\t\t\t") + "\"\n" +
+            "parameters " + ParameterDomainInputField.text + "\n" +
+            "resolution " + ParameterResolutionInputField.text
+        );
+        swriter.Close();
+        #endregion
+
+        //update project directory after saving is done
+        UpdateDirectory(WorkingProjectPath.text);
+    }
+    public void OnLoadClick()
+    {
+        string[] paths;
+        #if UNITY_STANDALONE_WIN
+        paths = StandaloneFileBrowser.OpenFilePanel("Select File", WorkingProjectPath.text, SaveFileExtention.TrimStart('.'), false);
+        if (paths.Length == 0) return;
+        #elif UNITY_ANDROID
+        paths = new string[] { Application.persistentDataPath + "/" + ObjectnameInput.text + SaveFileExtention };
+        #endif
+
+        FileInfo file = new FileInfo(paths[0]);
+       
+        AddTab(file);
+    }
+    #endregion
+
     //note, in order to create a single mesh from code, we have to adhere to the limitation the indexbuffer
     //which is if the device can support 32bit index buffer or not. otherwise
     //have to generate multiple meshes from code 
@@ -522,34 +566,134 @@ public class Main : MonoBehaviour
         parametricMesh.sampleresolution_V = 1;
         parametricMesh.sampleresolution_W = 1;
 
-        try
+        //set Mode
+        parametricMesh.mode = tab.ObjectMode;
+
+        //0 - explicit, 1 - implicit
+        if (tab.ObjectMode == 0)
         {
-            #region obtain and process resolution format 
-            //Accepted Formated as: [#] [# #] [# # #] 
-            //                  or  [#] [#,#] [#,#,#] 
-            //                  or  (#) (# #) (# # #)
-            //                  or  (#) (#,#) (#,#,#)
-            //                  or   #   # #   # # # 
-            //                  or   #   #,#   #,#,# 
-
-            string resolution = tab.Resolution;
-            resolution = resolution.TrimStart('[', '(', ' '); //remove '[' and ')'
-            resolution = resolution.TrimEnd(']', ')', ' '); //remove ']' and ')'
-
-            string[] res = resolution.Split(' ');//split string by space
-            //no space found
-            if (res.Length == 1)
+            #region user input validation on explicit input parameters
+            try
             {
-                #region processing resolution split by comma
-                res = resolution.Split(',');//split string by comma
+                #region obtain and set u v w domain 
+                //Accepted Formated as: [# #] [# # # #] [# # # # # #]
+                //                  or  [#,#] [#,#,#,#] [#,#,#,#,#,#]
+                //                  or  (# #) (# # # #) (# # # # # #)
+                //                  or  (#,#) (#,#,#,#) (#,#,#,#,#,#)
+                //                  or   # #   # # # #   # # # # # # 
+                //                  or   #,#   #,#,#,#   #,#,#,#,#,# 
 
-                if (res.Length >= 1)
+                string parameterdomain = tab.ParameterDomain;
+                parameterdomain = parameterdomain.TrimStart('[', '(', ' ').TrimEnd(']', ')', ' ');
+
+                string[] domains = parameterdomain.Split(' ');//split string by space
+                //no space found
+                if (domains.Length == 1)
                 {
-                    //convert the the string to int value as resolution U
-                    parametricMesh.sampleresolution_U = int.Parse(res[0].Trim(' '));
+                    #region processing domain split by comma
+                    domains = parameterdomain.Split(',');//split string by comma
+
+                    if (domains.Length == 1)
+                    {
+                        throw new Exception();
+                    }
+                    //comma found
+                    else if (domains.Length >= 2)
+                    {
+                        #region processing domain split by space
+                        //convert the the string to float value as resolution U min,max domain range
+                        parametricMesh.uMinDomain = float.Parse(domains[0].Trim(' '));
+                        parametricMesh.uMaxDomain = float.Parse(domains[1].Trim(' '));
+
+                        if (domains.Length >= 4)
+                        {
+                            //convert the the string to float value as resolution V min,max domain range
+                            parametricMesh.vMinDomain = float.Parse(domains[2].Trim(' '));
+                            parametricMesh.vMaxDomain = float.Parse(domains[3].Trim(' '));
+
+                            if (domains.Length >= 6)
+                            {
+                                //convert the the string to float value as resolution W min,max domain range
+                                parametricMesh.wMinDomain = float.Parse(domains[4].Trim(' '));
+                                parametricMesh.wMaxDomain = float.Parse(domains[5].Trim(' '));
+                            }
+                        }
+                        #endregion
+                    }
+
+                    #endregion
+                }
+                else if (domains.Length >= 2)
+                {
+                    #region processing domain split by space
+                    //convert the the string to float value as resolution U min,max domain range
+                    parametricMesh.uMinDomain = float.Parse(domains[0]);
+                    parametricMesh.uMaxDomain = float.Parse(domains[1]);
+
+                    if (domains.Length >= 4)
+                    {
+                        //convert the the string to float value as resolution V min,max domain range
+                        parametricMesh.vMinDomain = float.Parse(domains[2]);
+                        parametricMesh.vMaxDomain = float.Parse(domains[3]);
+
+                        if (domains.Length >= 6)
+                        {
+                            //convert the the string to float value as resolution W min,max domain range
+                            parametricMesh.wMinDomain = float.Parse(domains[4]);
+                            parametricMesh.wMaxDomain = float.Parse(domains[5]);
+                        }
+                    }
+                    #endregion
+                }
+                #endregion
+            }
+            catch
+            {
+                errorMessages += "Error in Domain input format.\n";
+            }
+            try
+            {
+                #region obtain and process resolution format 
+                //Accepted Formated as: [#] [# #] [# # #] 
+                //                  or  [#] [#,#] [#,#,#] 
+                //                  or  (#) (# #) (# # #)
+                //                  or  (#) (#,#) (#,#,#)
+                //                  or   #   # #   # # # 
+                //                  or   #   #,#   #,#,# 
+
+                string resolution = tab.Resolution;
+                resolution = resolution.TrimStart('[', '(', ' ').TrimEnd(']', ')', ' ');
+
+                string[] res = resolution.Split(' ');//split string by space
+                //no space found
+                if (res.Length == 1)
+                {
+                    #region processing resolution split by comma
+                    res = resolution.Split(',');//split string by comma
+
+                    if (res.Length >= 1)
+                    {
+                        //convert the the string to int value as resolution U
+                        parametricMesh.sampleresolution_U = int.Parse(res[0].Trim(' '));
+                    }
+                    else if (res.Length >= 2)
+                    {
+                        //convert the second part of the string to int value as resolution V
+                        parametricMesh.sampleresolution_V = int.Parse(res[1].Trim(' '));
+                        if (res.Length >= 3)
+                        {
+                            //convert the second part of the string to int value as resolution W
+                            parametricMesh.sampleresolution_W = int.Parse(res[2].Trim(' '));
+                        }
+                    }
+                    #endregion
                 }
                 else if (res.Length >= 2)
                 {
+                    #region processing resolution split by space
+                    //convert the first part of the string to int value as resolution U
+                    parametricMesh.sampleresolution_U = int.Parse(res[0].Trim(' '));
+
                     //convert the second part of the string to int value as resolution V
                     parametricMesh.sampleresolution_V = int.Parse(res[1].Trim(' '));
                     if (res.Length >= 3)
@@ -557,125 +701,163 @@ public class Main : MonoBehaviour
                         //convert the second part of the string to int value as resolution W
                         parametricMesh.sampleresolution_W = int.Parse(res[2].Trim(' '));
                     }
+                    #endregion
                 }
                 #endregion
             }
-            else if (res.Length >= 2)
+            catch
             {
-                #region processing resolution split by space
-                //convert the first part of the string to int value as resolution U
-                parametricMesh.sampleresolution_U = int.Parse(res[0]);
+                errorMessages += "Error in Resolution input format.\n";
+            }
 
-                //convert the second part of the string to int value as resolution V
-                parametricMesh.sampleresolution_V = int.Parse(res[1]);
-                if (res.Length >= 3)
-                {
-                    //convert the second part of the string to int value as resolution W
-                    parametricMesh.sampleresolution_W = int.Parse(res[2]);
-                }
-                #endregion
+            #region check if the resolution input by user is something the device(pc,phone,mac) can support
+            long maximumindex = 0;
+            if (SystemInfo.supports32bitsIndexBuffer)
+                maximumindex = 4000000000;
+            else
+                maximumindex = 65535;
+
+            long estimateVerticesCount = parametricMesh.sampleresolution_U * parametricMesh.sampleresolution_V * parametricMesh.sampleresolution_W;
+            if (estimateVerticesCount > maximumindex)
+            {
+                errorMessages += "Sampling Resolution Too Large For Device To Support.\n";
+                DisplayMessage(errorMessages);
+                return;
             }
             #endregion
-        }
-        catch
-        {
-            errorMessages += "Error in Resolution input format.\n";
-        }
 
-        #region check if the resolution input by user is something the device(pc,phone,mac) can support
-        long maximumindex = 0;
-        if (SystemInfo.supports32bitsIndexBuffer)
-            maximumindex = 4000000000;
+            #endregion
+        }
         else
-            maximumindex = 65535;
-       
-        long estimateVerticesCount = parametricMesh.sampleresolution_U * parametricMesh.sampleresolution_V * parametricMesh.sampleresolution_W;
-        if(estimateVerticesCount > maximumindex)
         {
-            errorMessages += "Sampling Resolution Too Large For Device To Support.\n";
-            DisplayMessage(errorMessages);
-            return;
-        }
-        #endregion
-
-        try
-        {
-            #region obtain and set u v w domain 
-            //Accepted Formated as: [# #] [# # # #] [# # # # # #]
-            //                  or  [#,#] [#,#,#,#] [#,#,#,#,#,#]
-            //                  or  (# #) (# # # #) (# # # # # #)
-            //                  or  (#,#) (#,#,#,#) (#,#,#,#,#,#)
-            //                  or   # #   # # # #   # # # # # # 
-            //                  or   #,#   #,#,#,#   #,#,#,#,#,# 
-
-            string parameterdomain = tab.ParameterDomain;
-            parameterdomain = parameterdomain.TrimStart('[', '(', ' '); //remove '[' and ')'
-            parameterdomain = parameterdomain.TrimEnd(']', ')', ' '); //remove ']' and ')'
-
-            string[] domains = parameterdomain.Split(' ');//split string by space
-            //no space found
-            if (domains.Length == 1)
+            #region user input validation on implicit input parameters
+            try
             {
-                #region processing domain split by comma
-                domains = parameterdomain.Split(',');//split string by comma
-
-                if (domains.Length == 1)
+                #region obtain and process bounding box size
+                //Accepted Formated as: [# # #] , [#,#,#] 
+                //                  or  (# # #) , (#,#,#)
+                //                  or   # # #  ,  #,#,# 
+                string size = BoundingBoxSizeInputField.text;
+                size = size.TrimStart('[', '(',' ').TrimEnd(']', ')',' ');
+                string[] sizearray = size.Split(' ');//split string by space
+                //no space found
+                if (sizearray.Length == 1)
                 {
-                    throw new Exception();
-                }
-                //comma found
-                else if(domains.Length >= 2)
-                {
-                    #region processing domain split by space
-                    //convert the the string to float value as resolution U min,max domain range
-                    parametricMesh.uMinDomain = float.Parse(domains[0].Trim(' '));
-                    parametricMesh.uMaxDomain = float.Parse(domains[1].Trim(' '));
+                    #region processing size split by comma
+                    sizearray = size.Split(',');//split string by comma
 
-                    if (domains.Length >= 4)
+                    if (sizearray.Length == 3)
                     {
-                        //convert the the string to float value as resolution V min,max domain range
-                        parametricMesh.vMinDomain = float.Parse(domains[2].Trim(' '));
-                        parametricMesh.vMaxDomain = float.Parse(domains[3].Trim(' '));
-
-                        if (domains.Length >= 6)
-                        {
-                            //convert the the string to float value as resolution W min,max domain range
-                            parametricMesh.wMinDomain = float.Parse(domains[4].Trim(' '));
-                            parametricMesh.wMaxDomain = float.Parse(domains[5].Trim(' '));
-                        }
+                        parametricMesh.MarchingBoundingBoxSize = new Vector3(float.Parse(sizearray[0].Trim(' ')), float.Parse(sizearray[1].Trim(' ')), float.Parse(sizearray[2].Trim(' ')));
+                    }
+                    else
+                    {
+                        throw new Exception();
                     }
                     #endregion
                 }
-
-                #endregion
-            }
-            else if (domains.Length >= 2)
-            {
-                #region processing domain split by space
-                //convert the the string to float value as resolution U min,max domain range
-                parametricMesh.uMinDomain = float.Parse(domains[0]);
-                parametricMesh.uMaxDomain = float.Parse(domains[1]);
-
-                if (domains.Length >= 4)
+                //space found
+                else if (sizearray.Length == 3)
                 {
-                    //convert the the string to float value as resolution V min,max domain range
-                    parametricMesh.vMinDomain = float.Parse(domains[2]);
-                    parametricMesh.vMaxDomain = float.Parse(domains[3]);
-
-                    if (domains.Length >= 6)
-                    {
-                        //convert the the string to float value as resolution W min,max domain range
-                        parametricMesh.wMinDomain = float.Parse(domains[4]);
-                        parametricMesh.wMaxDomain = float.Parse(domains[5]);
-                    }
+                    #region processing resolution split by space
+                    parametricMesh.MarchingBoundingBoxSize = new Vector3(float.Parse(sizearray[0].Trim(' ')), float.Parse(sizearray[1].Trim(' ')), float.Parse(sizearray[2].Trim(' ')));
+                    #endregion
+                }
+                else
+                {
+                    throw new Exception();
                 }
                 #endregion
             }
+            catch
+            {
+                errorMessages += "Error in BBSize input format.\n";
+            }
+            try
+            {
+                #region obtain and process bounding box center position
+                //Accepted Formated as: [# # #] , [#,#,#] 
+                //                  or  (# # #) , (#,#,#)
+                //                  or   # # #  ,  #,#,# 
+                string pos = BoundingBoxCenterInputField.text;
+                pos = pos.TrimStart('[', '(', ' ').TrimEnd(']', ')', ' ');
+                string[] posarray = pos.Split(' ');//split string by space
+                //no space found
+                if (posarray.Length == 1)
+                {
+                    #region processing size split by comma
+                    posarray = pos.Split(',');//split string by comma
+
+                    if (posarray.Length == 3)
+                    {
+                        parametricMesh.MarchingBoundingBoxCenter = new Vector3(float.Parse(posarray[0].Trim(' ')), float.Parse(posarray[1].Trim(' ')), float.Parse(posarray[2].Trim(' ')));
+                    }
+                    else
+                    {
+                        throw new Exception();
+                    }
+                    #endregion
+                }
+                //space found
+                else if (posarray.Length == 3)
+                {
+                    #region processing resolution split by space
+                    parametricMesh.MarchingBoundingBoxCenter = new Vector3(float.Parse(posarray[0].Trim(' ')), float.Parse(posarray[1].Trim(' ')), float.Parse(posarray[2].Trim(' ')));
+                    #endregion
+                }
+                else
+                {
+                    throw new Exception();
+                }
+                #endregion
+            }
+            catch
+            {
+                errorMessages += "Error in BBPosition input format.\n";
+            }
+            try
+            {
+                #region obtain and process bounding box resolution
+                //Accepted Formated as: [# # #] , [#,#,#] 
+                //                  or  (# # #) , (#,#,#)
+                //                  or   # # #  ,  #,#,# 
+                string res = BoundingBoxResolutionInputField.text;
+                res = res.TrimStart('[', '(', ' ').TrimEnd(']', ')', ' ');
+                string[] resarray = res.Split(' ');//split string by space
+                //no space found
+                if (resarray.Length == 1)
+                {
+                    #region processing size split by comma
+                    resarray = res.Split(',');//split string by comma
+
+                    if (resarray.Length == 3)
+                    {
+                        parametricMesh.BoundingBoxResolution = new Vector3(float.Parse(resarray[0].Trim(' ')), float.Parse(resarray[1].Trim(' ')), float.Parse(resarray[2].Trim(' ')));
+                    }
+                    else
+                    {
+                        throw new Exception();
+                    }
+                    #endregion
+                }
+                //space found
+                else if (resarray.Length == 3)
+                {
+                    #region processing resolution split by space
+                    parametricMesh.BoundingBoxResolution = new Vector3(float.Parse(resarray[0].Trim(' ')), float.Parse(resarray[1].Trim(' ')), float.Parse(resarray[2].Trim(' ')));
+                    #endregion
+                }
+                else
+                {
+                    throw new Exception();
+                }
+                #endregion
+            }
+            catch
+            {
+                errorMessages += "Error in BBResolution input format.\n";
+            }
             #endregion
-        }
-        catch
-        {
-            errorMessages += "Error in Domain input format.\n";
         }
 
         #region diffuse check
@@ -683,7 +865,7 @@ public class Main : MonoBehaviour
         //Accepted format: (R,G,B) [R,G,B] R,G,B (#) [#] #
         //Forced format: R,G,B where R,G,B is 0-1 value
         string diffusetext = DiffuseColorInputField.text;
-        diffusetext = diffusetext.TrimStart('[', '(').TrimEnd(']', ')');
+        diffusetext = diffusetext.TrimStart('[', '(', ' ').TrimEnd(']', ')', ' ');
         string[] diffusecolorarray = diffusetext.Split(',');
         float diffuse_R = 0, diffuse_G = 0, diffuse_B = 0;
         try
@@ -717,7 +899,7 @@ public class Main : MonoBehaviour
         //Accepted format: (R,G,B) [R,G,B] R,G,B (#) [#] #
         //Forced format: R,G,B where R,G,B is 0-1 value
         string speculartext = SpecularColorInputField.text;
-        speculartext = speculartext.TrimStart('[', '(').TrimEnd(']', ')');
+        speculartext = speculartext.TrimStart('[', '(', ' ').TrimEnd(']', ')', ' ');
         string[] specularcolorarray = speculartext.Split(',');
         float specular_R = 0,specular_G = 0,specular_B = 0;
         try
@@ -751,7 +933,7 @@ public class Main : MonoBehaviour
         //Accepted format: (#) [#] #
         //Forced format: # where # is 0-1 value
         string transparency = TransparencyInputField.text;
-        transparency = transparency.TrimStart('[', '(').TrimEnd(']', ')').Trim(' ');
+        transparency = transparency.TrimStart('[', '(', ' ').TrimEnd(']', ')', ' ');
         float transparencyvalue = 1;
         try
         {
@@ -769,7 +951,7 @@ public class Main : MonoBehaviour
         //Accepted format: (#) [#] #
         //Forced format: # where # is 0-1 value
         string text = ShininessInputField.text;
-        text = text.TrimStart('[', '(').TrimEnd(']', ')').Trim(' ');
+        text = text.TrimStart('[', '(', ' ').TrimEnd(']', ')', ' ');
         float shininess = 0.5f;
         try
         {
@@ -782,7 +964,7 @@ public class Main : MonoBehaviour
         }
         #endregion
 
-        //stop running if theres an error
+        //stop the run if theres an error
         if (errorMessages.Length > 0)
         {
             DisplayMessage(errorMessages.TrimEnd('\n'));
@@ -820,12 +1002,20 @@ public class Main : MonoBehaviour
     }
     void CopyAllObjectInfoToTab(Tab tabtocopyto)
     {
+        tabtocopyto.ObjectMode = ModeInputField.value;
+
         tabtocopyto.ObjectName = ObjectNameInputField.text;
         tabtocopyto.SetText(ObjectNameInputField.text);
         tabtocopyto.gameObject.name = ObjectNameInputField.text;
+
+
         tabtocopyto.ParameterDomain = ParameterDomainInputField.text;
         tabtocopyto.Resolution = ParameterResolutionInputField.text;
-        
+
+        tabtocopyto.MarchingBoundingBoxSize = BoundingBoxSizeInputField.text;
+        tabtocopyto.MarchingBoundingBoxCenter = BoundingBoxCenterInputField.text;
+        tabtocopyto.BoundingBoxResolution = BoundingBoxResolutionInputField.text;
+
         tabtocopyto.Code = CodeInputField.text;
 
         tabtocopyto.DiffuseColor = DiffuseColorInputField.text;
@@ -839,8 +1029,6 @@ public class Main : MonoBehaviour
     {
         PopupMessage.Instance.ShowMessage(message);
     }
-
-
 
 
 
