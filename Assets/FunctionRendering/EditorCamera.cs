@@ -1,67 +1,67 @@
-﻿using UnityEngine;
+﻿/* TODO:
+ * Add more modes of camera
+ * Examine: Closely view the details of an object, zoom in/out, rotate around object
+ * Editor: Mimic Unity Editor Camera,
+ * Player: Camera of a virtual charater moving around the scene
+ */
+using UnityEngine;
 
 public class EditorCamera : MonoBehaviour
 {
-    public enum Mode {Examine/*,Editor*/}
+    public enum Mode {Examine,Editor,Player}
     public Mode currentmode = Mode.Examine;
 
-    //Mouse speed
-    public float mousexSpeed = 200.0f;
-    public float mouseySpeed = 200.0f;
-    //Examine mode
-    public Renderer lookattarget;
-    public Vector3 lookatpos;
-    public int yMinLimit = -80;
-    public int yMaxLimit = 80;
-    public float mouseDampening = 5.0f;
-    public float distance = 5.0f;
-    public int zoomRate = 40;
-    public float zoomDampening = 5.0f;
-
-    float xDeg = 0.0f;
-    float yDeg = 0.0f;
+    //Examine mode variables
+    GameObject ExamineTarget;
+    Vector3 ExamineLookAtPosition;
+    float minimumcamdistance = 3.5f; //predefined minimum camera distance of 3.5f
     float currentDistance;
     float desiredDistance;
-    Quaternion desiredRotation;
+    //Examine mode Rotation variables 
+    float xDeg;
+    float yDeg;
+    //Examine mode settings
+    public Vector2 MouseSensitivity = new Vector2(200.0f, 200.0f);
+    public Vector2 TouchSensitivity = new Vector2(0.15f, 0.15f);
+    public float rotationDampening = 5.0f;
+    public int zoomSensitivity = 40;
+    public float zoomDampening = 5.0f;
+
+    //Camera Object variables
     Quaternion rotation;
     Vector3 position;
 
-
-
-    public void SetTarget(GameObject targetobject)
+    public void SetExamineTarget(GameObject targetobject)
     {
-        lookattarget = targetobject.GetComponent<Renderer>();
-        lookatpos = lookattarget.bounds.center;
+        // A little trick here to calculate size of mesh object
+        // First we get the bounds of the object, next obtain the lookat position 3d coordinates.
+        // We calculate the distance of the closest point on the bounds to the camera
+        // With the closest point minus the center, will give us the size/distance of the object to the camera
+        ExamineTarget = targetobject;
+        Bounds objectbounds = getBounds(targetobject);
+        ExamineLookAtPosition = objectbounds.center;
+        float size = Vector3.Distance(objectbounds.ClosestPoint(transform.position), ExamineLookAtPosition);
 
-        float minimum = 3.5f;//predefined minimum distance is 3.5 distance away
-
-        
-        // a little trickery here. we get the cloeset point on the bounding box to the camera
-        // with the cloest point minus the center, will give the size, where the camera is currently looking at
-        float size = Vector3.Distance(lookattarget.bounds.ClosestPoint(transform.position), lookatpos);
-        if(size < 1)
+        //Because we are using a 1x1x1 unit axis , if the object size is small we just use the minimum distance
+        float distance;
+        if (size <= 1)
         {
-            distance = minimum;
+            distance = minimumcamdistance;
         }
         else
         {
-            //special addition to see if object is within 5x5x5 bounds to increse distance
+            //We want to keep the camera in view of the origin(Vector3.zero) axis if the object is within 3x3x3 bounds.
             float bounds = 3;
             float extradistancetoincludeorigin = 0;
-            if(Vector3.Distance(lookatpos,Vector3.zero)<= bounds)
+            if(Vector3.Distance(ExamineLookAtPosition, Vector3.zero) <= bounds)
             {
-                extradistancetoincludeorigin = Vector3.Distance(lookatpos, Vector3.zero);
+                extradistancetoincludeorigin = Vector3.Distance(ExamineLookAtPosition, Vector3.zero);
             }
-            distance = minimum * size + extradistancetoincludeorigin;
+            distance = minimumcamdistance * size + extradistancetoincludeorigin;
         }
 
         currentDistance = distance;
         desiredDistance = distance;
-
-        //be sure to grab the current rotations as starting points.
-        position = transform.position;
-        rotation = transform.rotation;
-        desiredRotation = transform.rotation;
 
         xDeg = Vector3.Angle(Vector3.right, transform.right);
         yDeg = Vector3.Angle(Vector3.up, transform.up);
@@ -69,50 +69,52 @@ public class EditorCamera : MonoBehaviour
 
     void LateUpdate()
     {
+        //Examine Logic
         if (currentmode == Mode.Examine)
         {
-            if (!lookattarget) return;
+            //Skip If no target have been set to examine
+            if (ExamineTarget == null) return;
 
-            float inputx = 0;
-            float inputy = 0;
-            //Mouse input only for PC and MC
+            float inputX = 0;
+            float inputY = 0;
+
+            #region Obtain Inputs for Rotation
+            //Obtain Mouse Input for PC and MaC
             #if UNITY_STANDALONE_WIN
             if (Input.GetMouseButton(0))
             {
-                inputx = Input.GetAxis("Mouse X");
-                inputy = Input.GetAxis("Mouse Y");
+                inputX = Input.GetAxis("Mouse X") * MouseSensitivity.x;
+                inputY = Input.GetAxis("Mouse Y") * MouseSensitivity.y;
             }
             #elif UNITY_ANDROID
-            //touch input
+            //Obtain Touch Input for Android Devices
             if (Input.touchCount == 1  && Input.GetTouch(0).phase == TouchPhase.Moved)
             {
-             //Get movement of the finger since last frame
+                //Get movement of the finger (delta) since last frame
                 Vector2 touchDeltaPosition = Input.GetTouch(0).deltaPosition;
-
-                Vector2 sensitity = new Vector2(0.15f, 0.15f);
-                inputx = touchDeltaPosition.x * sensitity.x;
-                inputy = touchDeltaPosition.y * sensitity.y;
+                inputx = touchDeltaPosition.x * TouchSensitity.x;
+                inputy = touchDeltaPosition.y * TouchSensitity.y;
             }
             #endif
-
-            #region rotation
-            //Rotation
-            xDeg += inputx * mousexSpeed * 0.02f;
-            yDeg -= inputy * mouseySpeed * 0.02f;
-            //Clamp the vertical axis (up down)
-            // yDeg = ClampAngle(yDeg, yMinLimit, yMaxLimit);
-            // set camera rotation 
-            desiredRotation = Quaternion.Euler(yDeg, xDeg, 0);
-            //Apply dampening
-            rotation = Quaternion.Lerp(transform.rotation, desiredRotation, Time.deltaTime * mouseDampening);
             #endregion
 
+            #region Apply Rotation
+            //Rotation based on inputX and inputY
+            xDeg += inputX * 0.02f;
+            yDeg -= inputY * 0.02f;
 
-            #region zoom
+            //Set the desiredRotatation 
+            Quaternion desiredRotation = Quaternion.Euler(yDeg, xDeg, 0);
+
+            //Apply Rotation by slowling lerping towards the desired rotation using a rotation dampening value
+            rotation = Quaternion.Lerp(transform.rotation, desiredRotation, Time.deltaTime * rotationDampening);
+            #endregion
+
             float inputzoom = 0;
 
-            //for mouse input
-            inputzoom += Input.GetAxis("Mouse ScrollWheel");
+            #region Obtain Inputs for Zoom
+            //Obtain Mouse Input for PC and MaC
+            inputzoom = Input.GetAxis("Mouse ScrollWheel");
 
             //touch input for zoom
             if (Input.touchCount == 2)
@@ -132,28 +134,68 @@ public class EditorCamera : MonoBehaviour
                 // Find the difference in the distances between each frame.
                 float deltaMagnitudeDiff = prevTouchDeltaMag - touchDeltaMag;
 
-                inputzoom += deltaMagnitudeDiff;
+                inputzoom = Mathf.Sign(deltaMagnitudeDiff) * 0.03f;
             }
-
-            // affect the desired Zoom distance if we roll the scrollwheel
-            desiredDistance -= inputzoom * Time.deltaTime * zoomRate * Mathf.Abs(desiredDistance);
-            // For smoothing of the zoom, lerp distance
-            currentDistance = Mathf.Lerp(currentDistance, desiredDistance, Time.deltaTime * zoomDampening);
-            // calculate position based on the new currentDistance 
-            position = lookatpos - (rotation * Vector3.forward * currentDistance);
             #endregion
 
+            #region Apply Zoom
+            // Change the desired distance based on zoom
+            desiredDistance -= inputzoom * Time.deltaTime * zoomSensitivity * Mathf.Abs(desiredDistance);
+
+            // Lerp the current distance with desiredfFor smoothing of the zoom
+            currentDistance = Mathf.Lerp(currentDistance, desiredDistance, Time.deltaTime * zoomDampening);
+
+            // calculate position based on the currentDistance away from the lookattarget position
+            position = ExamineLookAtPosition - (rotation * Vector3.forward * currentDistance);
+            #endregion
+
+            //Apply it to the gameobject
             transform.rotation = rotation;
             transform.position = position;
         }
+        else if (currentmode == Mode.Editor)
+        {
+            //TODO
+        }
+    
+        {
+            //TODO
+        }
     }
 
-    private static float ClampAngle(float angle, float min, float max)
+    //function to obtain the bounds of the current object, or the bounds of its children gameobjects
+    //https://forum.unity.com/threads/getting-the-bounds-of-the-group-of-objects.70979/
+    Bounds getBounds(GameObject objeto)
     {
-        if (angle < -360)
-            angle += 360;
-        if (angle > 360)
-            angle -= 360;
-        return Mathf.Clamp(angle, min, max);
+        Bounds bounds;
+        Renderer childRender;
+        bounds = getRenderBounds(objeto);
+        if (bounds.extents.x == 0)
+        {
+            bounds = new Bounds(objeto.transform.position, Vector3.zero);
+            foreach (Transform child in objeto.transform)
+            {
+                childRender = child.GetComponent<Renderer>();
+                if (childRender)
+                {
+                    bounds.Encapsulate(childRender.bounds);
+                }
+                else
+                {
+                    bounds.Encapsulate(getBounds(child.gameObject));
+                }
+            }
+        }
+        return bounds;
+    }
+    Bounds getRenderBounds(GameObject objeto)
+    {
+        Bounds bounds = new Bounds(Vector3.zero, Vector3.zero);
+        Renderer render = objeto.GetComponent<Renderer>();
+        if (render != null)
+        {
+            return render.bounds;
+        }
+        return bounds;
     }
 }

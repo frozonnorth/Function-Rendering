@@ -5,7 +5,7 @@ EditorBuildSettings:
   m_ObjectHideFlags: 0
   serializedVersion: 2
   m_Scenes:
-  - enabled: 0
-    path: Assets/Main/android.unity
-    guid: 26366e1a633e4bb438f875647b5cf1e8
+  - enabled: 1
+    path: Assets/FunctionRendering/pc2.unity
+    guid: 643c04646ec11d040a018e3469619d40
   m_configObjects: {}

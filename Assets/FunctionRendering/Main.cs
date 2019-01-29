@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using UnityEngine.UI;
 using System.IO;
 
-
 //standalone file browser
 using SFB;
 using System;
@@ -52,23 +51,27 @@ public class Main : MonoBehaviour
     public GameObject TabPrefab;
     #endregion
 
-    #region Settings
-    const string SaveFileExtention = ".Func";
+    #region Program Settings
+    const string SaveFileExtention = ".Func";//The file extention name to be saved
     #endregion
 
     #region Camera
     public EditorCamera viewcamera;
     #endregion
 
-    public Material MeshObjectMaterial;
-    GameObject currentObject;//unity gameobject that holds the generated mesh
-    MeshRenderer rend;
+    public Material SolidMeshObjectMaterial;
+    public Material WireframeMeshObjectMaterial;
+
+    //Stored Refrences
+    GameObject currentObject;
+    MeshRenderer currentObjectMeshRenderer;
     Tab currentObjectTab;
 
-    #region Singleton - for other scripts for easy acess
+    #region Singleton - for other scripts to access the functions of this script easily
     public static Main Instance;
     void Awake()
     {
+        //Ensure that theres only one instance of the Singleton class, otherwise destory it
         if (Instance == null)
             Instance = this;
         else if (Instance != this)
@@ -76,44 +79,76 @@ public class Main : MonoBehaviour
     }
     #endregion 
 
-
+    //This Runs when game Starts
     void Start()
     {
-        currentObject = new GameObject("ParametricMesh", typeof(MeshFilter));
-        rend = currentObject.AddComponent<MeshRenderer>();
-        rend.material = new Material(MeshObjectMaterial);
-        viewcamera.SetTarget(currentObject);
+        //Create a new gameobject and attach a MeshFilter component to it. Keep in variable for refrence
+        //MeshFilter component is required to asign and change mesh
+        currentObject = new GameObject("GeneratedMeshObject", typeof(MeshFilter));
 
-        #if UNITY_ANDROID
-        OnProjectDirectoryChange();//For android, we want to populate the file directory at start
+        //Attach a MeshRenderer component to the new GameObject.
+        //MeshRenderer component is required to display the mesh and to change the materials/apparence.
+        currentObjectMeshRenderer = currentObject.AddComponent<MeshRenderer>();
+
+        //Set Camera to Examine Mode at start
+        viewcamera.currentmode = EditorCamera.Mode.Examine;
+        viewcamera.SetExamineTarget(currentObject);
+
+        //For Windows only, we want to check if we had previously saved the last project path
+        //Update directory to the last project path
+        #if UNITY_STANDALONE_WIN
+        string path = PlayerPrefs.GetString("LastProjectPath","nopath");
+        if(path != "nopath")
+        {
+            WorkingProjectPath.text = path;
+            UpdateDirectory(WorkingProjectPath.text);
+        }
+
+        //For Android, //The project path will always be Application.persistentDataPath, 
+        //This is the path allocated by the android device for the application
+        #elif UNITY_ANDROID
+        WorkingProjectPath.text = Application.persistentDataPath
+        UpdateDirectory(WorkingProjectPath.text);
         #endif
     }
 
-
-    #region file directory
+    #region Directory and Files Click Events
+    //Event to be trigger when Directory Change Button is Click
     public void OnProjectDirectoryChange()
     {
         string[] paths;
-        #if UNITY_STANDALONE_WIN
-        paths = StandaloneFileBrowser.OpenFolderPanel("Select Project Folder", PlayerPrefs.GetString("LastProjectPath", Application.dataPath), false);
-        if (paths.Length == 0) return;
-        PlayerPrefs.SetString("LastProjectPath", paths[0]);
-        #elif UNITY_ANDROID
-        paths = new string[] { Application.persistentDataPath};
-        #endif
 
+        //Only for Windows
+        #if UNITY_STANDALONE_WIN || UNITY_WEBGL
+
+        //Uses StandaloneFileBrowser class to help open up a folder 
+        //This opens up a popup window in the native OS - Windows or Mac PC
+        paths = StandaloneFileBrowser.OpenFolderPanel("Select Project Folder", PlayerPrefs.GetString("LastProjectPath", Application.dataPath), false);
+
+        //If User has not selected a path, and just exited the popup window, do nothing
+        if (paths.Length == 0) return;
+
+        //Otherwise change the inputfield text to show the selected path
         WorkingProjectPath.text = paths[0];
+
+        //save the current path choosen path into playerpref (PC/MAC save file) to be automatically open next execution
+        PlayerPrefs.SetString("LastProjectPath", paths[0]);
+
+        #elif UNITY_ANDROID
+        //For Android, do nothing
+        #endif
 
         UpdateDirectory(WorkingProjectPath.text);
     }
     void UpdateDirectory(string path)
     {
-        //Remove any existing directory object
+        //Remove all existing directory item
         foreach (DirectoryItem item in directorylist)
         {
             Destroy(item.gameObject);
         }
         directorylist.Clear();
+
         //Remove any existing file object
         foreach (FileItem item in filelist)
         {
@@ -121,7 +156,7 @@ public class Main : MonoBehaviour
         }
         filelist.Clear();
 
-        //create and display all the directories and files in the new project path
+        //Create and display all the directories in the project path
         DirectoryInfo directoryinfo = new DirectoryInfo(path);
         DirectoryInfo[] directoryinfoarray = directoryinfo.GetDirectories();
         for (int i = 0; i < directoryinfoarray.Length; i++)
@@ -136,6 +171,8 @@ public class Main : MonoBehaviour
 
             directorylist.Add(di);
         }
+
+        //Create and display all the files specific to the extention type in the project path
         FileInfo[] fileinfoarray = directoryinfo.GetFiles("*" + SaveFileExtention);
         for (int i = 0; i < fileinfoarray.Length; i++)
         {
@@ -150,19 +187,23 @@ public class Main : MonoBehaviour
             filelist.Add(fi);
         }
     }
+    //Event to be trigger when Directory is Click
     public void OnDirectoryClick(DirectoryItem directoryitem)
     {
-        if (directoryitem.expanded) // remove child directory and files if this directory is already expanded
+        //If the current directory that was click is already expanded,
+        //Remove all child directory and all child files
+        if (directoryitem.expanded)
         {
             directoryitem.RemoveChildDirectory();
             directoryitem.RemoveChildFile();
             directoryitem.expanded = false;
             directoryitem.UpdateIcon();
-            //directoryitem.UpdateUI();
-            //Canvas.ForceUpdateCanvases();
         }
-        else // add child directory and files it not expanded
+
+        //Otherwise expand the current directory
+        else
         {
+            //Find and Populate child directory
             DirectoryInfo[] directoryinfoarray = directoryitem.directoryinfo.GetDirectories();
             for (int i = 0; i < directoryinfoarray.Length; i++)
             {
@@ -176,6 +217,8 @@ public class Main : MonoBehaviour
 
                 directoryitem.childdirectoryitem.Add(di);
             }
+
+            //Find and Populate child files
             FileInfo[] fileinfoarray = directoryitem.directoryinfo.GetFiles("*"+ SaveFileExtention);
             for (int i = 0; i < fileinfoarray.Length; i++)
             {
@@ -192,15 +235,16 @@ public class Main : MonoBehaviour
 
             directoryitem.expanded = true;
             directoryitem.UpdateIcon();
-            //directoryitem.UpdateUI();
-            //Canvas.ForceUpdateCanvases();
         }
     }
+    //Event to be trigger when File is Click
     public void OnFileClick(FileItem file)
     {
-        //open file as new tab
+        //Add new tab when user clicks a file
         AddTab(file.fileinfo);
     }
+    #endregion
+
 
     Tab CreateNewTab(string name = "New Tab")
     {
@@ -292,6 +336,41 @@ public class Main : MonoBehaviour
                     currentObjectTab.BoundingBoxResolution = line.Trim();
                 }
 
+                //find "bounding box resolution"
+                else if (line.Contains("bboxResolution"))
+                {
+                    line = line.Replace("bboxResolution", "");
+                    currentObjectTab.BoundingBoxResolution = line.Trim();
+                }
+
+                //find "diffuseColor"
+                else if (line.Contains("diffuseColor"))
+                {
+                    line = line.Replace("diffuseColor", "");
+                    currentObjectTab.DiffuseColor = line.Trim();
+                }
+
+                //find "diffuseColor"
+                else if (line.Contains("SpecularColor"))
+                {
+                    line = line.Replace("SpecularColor", "");
+                    currentObjectTab.SpecularColor = line.Trim();
+                }
+
+                //find "Transparency"
+                else if (line.Contains("Transparency"))
+                {
+                    line = line.Replace("Transparency", "");
+                    currentObjectTab.Transparency = line.Trim();
+                }
+
+                //find "Shininess"
+                else if (line.Contains("Shininess"))
+                {
+                    line = line.Replace("Shininess", "");
+                    currentObjectTab.Shininess = line.Trim();
+                }
+
                 line = sreader.ReadLine(); // next line
 
                 linecounter++;
@@ -309,7 +388,7 @@ public class Main : MonoBehaviour
 
         CreateParametricMeshFromTab(currentObjectTab);
     }
-    #endregion
+
 
     #region ModeDropdown Selection Event
     public void OnModeChange(int mode)
@@ -369,6 +448,8 @@ public class Main : MonoBehaviour
             BoundingBoxSizeInputField.text = "[100 100 100]";
             BoundingBoxCenterInputField.text = "[0 0 0]";
             BoundingBoxResolutionInputField.text = "[0 1 0 1 0 1]";
+
+            currentObject.GetComponent<MeshFilter>().mesh = null;
         }
         //if we trying to close the current selected tab
         else if (currentObjectTab == tab)
@@ -413,88 +494,65 @@ public class Main : MonoBehaviour
     }
     #endregion
 
-    #region Extra Input Fields On Change Event (only for user input validation)
+    #region Extra Input Fields On Change Event (For user Input validation)
     public void OnDiffuseColorChange()
     {
-        //Format checking and format forcing
-        //Accepted format: (R,G,B) [R,G,B] R,G,B (#) [#] #
-        //Forced format: R,G,B where R,G,B is 0-1 value
+        //Accepted format: R G B
+        //Forced R G B to be value between 0 - 1
         string text = DiffuseColorInputField.text;
-        text = text.TrimStart('[', '(').TrimEnd(']',')');  
-        string[] colorarray = text.Split(',');
-        float R;
-        float G;
-        float B;
+        string[] colorarray = text.Split(' ');
         try
         {
-            if (colorarray.Length == 1)
+            if (colorarray.Length == 3)
             {
-                R = Mathf.Clamp01(float.Parse(colorarray[0]));
-                G = R;
-                B = R;
-            }
-            else if (colorarray.Length == 3)
-            {
-                R = Mathf.Clamp01(float.Parse(colorarray[0].Trim(' ')));
-                G = Mathf.Clamp01(float.Parse(colorarray[1].Trim(' ')));
-                B = Mathf.Clamp01(float.Parse(colorarray[2].Trim(' ')));
+                float R = Mathf.Clamp01(float.Parse(colorarray[0].Trim(' ')));
+                float G = Mathf.Clamp01(float.Parse(colorarray[1].Trim(' ')));
+                float B = Mathf.Clamp01(float.Parse(colorarray[2].Trim(' ')));
+                DiffuseColorInputField.text = R + " " + G + " " + B;
             }
             else
             {
                 throw new Exception();
             }
-            DiffuseColorInputField.text = R +","+ G + "," + B;
         }
         catch
         {
-            DisplayMessage("Error in Diffuse Color input format:\"R,G,B\"");
+            DisplayMessage("Error in Diffuse Color input format:\"R G B\"");
             return;
         }
     }
     public void OnSpecularColorChange()
     {
-        //Format checking and format forcing
-        //Accepted format: (R,G,B) [R,G,B] R,G,B (#) [#] #
-        //Forced format: R,G,B where R,G,B is 0-1 value
+        //Accepted format: R G B
+        //Forced R G B to be value between 0 - 1
         string text = SpecularColorInputField.text;
-        text = text.TrimStart('[', '(').TrimEnd(']', ')');
-        string[] colorarray = text.Split(',');
-        float R;
-        float G;
-        float B;
+        string[] colorarray = text.Split(' ');
         try
         {
-            if (colorarray.Length == 1)
+            if (colorarray.Length == 3)
             {
-                R = Mathf.Clamp01(float.Parse(colorarray[0]));
-                G = R;
-                B = R;
-            }
-            else if (colorarray.Length == 3)
-            {
-                R = Mathf.Clamp01(float.Parse(colorarray[0].Trim(' ')));
-                G = Mathf.Clamp01(float.Parse(colorarray[1].Trim(' ')));
-                B = Mathf.Clamp01(float.Parse(colorarray[2].Trim(' ')));
+                float R = Mathf.Clamp01(float.Parse(colorarray[0].Trim(' ')));
+                float G = Mathf.Clamp01(float.Parse(colorarray[1].Trim(' ')));
+                float B = Mathf.Clamp01(float.Parse(colorarray[2].Trim(' ')));
+                SpecularColorInputField.text = R + " " + G + " " + B;
             }
             else
             {
                 throw new Exception();
             }
-            SpecularColorInputField.text = R + "," + G + "," + B;
+            
         }
         catch
         {
-            DisplayMessage("Error in Specular Color input format:\"R,G,B\"");
+            DisplayMessage("Error in Specular Color input format:\"R G B\"");
             return;
         }
     }
     public void OnTransparencyChange()
     {
-        //Format checking and format forcing
-        //Accepted format: (#) [#] #
-        //Forced format: # where # is 0-1 value
+        //Accepted format: #
+        //Forced # to be value between 0 - 1
         string text = TransparencyInputField.text;
-        text = text.TrimStart('[', '(').TrimEnd(']', ')').Trim(' ');
         try
         {
             float transparencyvalue = Mathf.Clamp01(float.Parse(text));
@@ -508,14 +566,12 @@ public class Main : MonoBehaviour
     }
     public void OnShininessChange()
     {
-        //Format checking and format forcing
-        //Accepted format: (#) [#] #
-        //Forced format: # where # is 0-1 value
-        string text = ShininessInputField.text;
-        text = text.TrimStart('[', '(').TrimEnd(']', ')').Trim(' ');
+        //Accepted format: #
+        //Forced # to be value between 0 - 1
+        string shinytext = ShininessInputField.text;
         try
         {
-            float shininess = Mathf.Clamp01(float.Parse(text));
+            float shininess = Mathf.Clamp01(float.Parse(shinytext.Trim(' ')));
             ShininessInputField.text = shininess.ToString();
         }
         catch
@@ -538,18 +594,19 @@ public class Main : MonoBehaviour
 
         CreateParametricMeshFromTab(currentObjectTab);
 
-        viewcamera.SetTarget(currentObject);
+        viewcamera.SetExamineTarget(currentObject);
     }
+    //Save the data currently on the input field, Not the current Tab
     public void OnSaveClick()
     {
         //open file browser and ask user to select the save path
-        #if UNITY_STANDALONE_WIN
+#if UNITY_STANDALONE_WIN || UNITY_WEBGL
         string path = StandaloneFileBrowser.SaveFilePanel("Save File", WorkingProjectPath.text, ObjectNameInputField.text, SaveFileExtention.TrimStart('.'));
         if (path == "") return;
         FileInfo file = new FileInfo(path);
-        #elif UNITY_ANDROID
-        FileInfo file = new FileInfo(Application.persistentDataPath + "/" + ObjectnameInput.text + SaveFileExtention);
-        #endif
+#elif UNITY_ANDROID
+        FileInfo file = new FileInfo(Application.persistentDataPath + "/" + ObjectNameInputField.text + SaveFileExtention);
+#endif
 
         #region write data
         StreamWriter swriter;
@@ -572,7 +629,12 @@ public class Main : MonoBehaviour
                 "mode " + ModeInputField.value + "\n" +
                 "definition \"" + CodeInputField.text.Replace("\n", "\n\t\t\t") + "\"\n" +
                 "parameters " + ParameterDomainInputField.text + "\n" +
-                "resolution " + ParameterResolutionInputField.text
+                "resolution " + ParameterResolutionInputField.text + "\n" +
+
+                "diffuseColor " + DiffuseColorInputField.text + "\n" +
+                "SpecularColor " + SpecularColorInputField.text + "\n" +
+                "Transparency " + TransparencyInputField.text + "\n" +
+                "Shininess " + ShininessInputField.text
             );
         }
         else if (mode == 1)
@@ -583,7 +645,12 @@ public class Main : MonoBehaviour
                 "definition \"" + CodeInputField.text.Replace("\n", "\n\t\t\t") + "\"\n" +
                 "bboxSize " + BoundingBoxSizeInputField.text + "\n" +
                 "bboxCenter " + BoundingBoxCenterInputField.text + "\n" +
-                "bboxResolution " + BoundingBoxResolutionInputField.text
+                "bboxResolution " + BoundingBoxResolutionInputField.text + "\n" +
+
+                "diffuseColor " + DiffuseColorInputField.text + "\n" +
+                "SpecularColor " + SpecularColorInputField.text + "\n" +
+                "Transparency " + TransparencyInputField.text + "\n" +
+                "Shininess " + ShininessInputField.text
             );
         }
 
@@ -601,18 +668,18 @@ public class Main : MonoBehaviour
     public void OnLoadClick()
     {
         string[] paths;
-        #if UNITY_STANDALONE_WIN
+#if UNITY_STANDALONE_WIN || UNITY_WEBGL
         paths = StandaloneFileBrowser.OpenFilePanel("Select File", WorkingProjectPath.text, SaveFileExtention.TrimStart('.'), false);
         if (paths.Length == 0) return;
-        #elif UNITY_ANDROID
-        paths = new string[] { Application.persistentDataPath + "/" + ObjectnameInput.text + SaveFileExtention };
-        #endif
+#elif UNITY_ANDROID
+        paths = new string[] { Application.persistentDataPath + "/" + ObjectNameInputField.text + SaveFileExtention };
+#endif
 
         FileInfo file = new FileInfo(paths[0]);
        
         AddTab(file);
     }
-    #endregion
+#endregion
 
     //note, in order to create a single mesh from code, we have to adhere to the limitation the indexbuffer
     //which is if the device can support 32bit index buffer or not. otherwise
@@ -621,10 +688,10 @@ public class Main : MonoBehaviour
     {
         string errorMessages = string.Empty;
 
-        ParametricMesh parametricMesh;
-        if (!(parametricMesh = currentObject.GetComponent<ParametricMesh>()))
+        FunctionGeneratedMesh parametricMesh;
+        if (!(parametricMesh = currentObject.GetComponent<FunctionGeneratedMesh>()))
         {
-            parametricMesh = currentObject.AddComponent<ParametricMesh>();
+            parametricMesh = currentObject.AddComponent<FunctionGeneratedMesh>();
         }
 
         //set default value
@@ -638,145 +705,75 @@ public class Main : MonoBehaviour
         //0 - explicit, 1 - implicit
         if (tab.ObjectMode == 0)
         {
-            #region user input validation on explicit input parameters
+            #region User Input Validation On Parametric Input Parameters
             try
             {
-                #region obtain and set u v w domain 
-                //Accepted Formated as: [# #] [# # # #] [# # # # # #]
-                //                  or  [#,#] [#,#,#,#] [#,#,#,#,#,#]
-                //                  or  (# #) (# # # #) (# # # # # #)
-                //                  or  (#,#) (#,#,#,#) (#,#,#,#,#,#)
-                //                  or   # #   # # # #   # # # # # # 
-                //                  or   #,#   #,#,#,#   #,#,#,#,#,# 
-
+                #region Obtain U V W domain from the tab and set into parametricmesh class 
+                //Accepted Formated as: "# #" or "# # # #" or "# # # # # #"
                 string parameterdomain = tab.ParameterDomain;
-                parameterdomain = parameterdomain.TrimStart('[', '(', ' ').TrimEnd(']', ')', ' ');
 
                 string[] domains = parameterdomain.Split(' ');//split string by space
-                //no space found
-                if (domains.Length == 1)
+                if (domains.Length >= 2)
                 {
-                    #region processing domain split by comma
-                    domains = parameterdomain.Split(',');//split string by comma
-
-                    if (domains.Length == 1)
-                    {
-                        throw new Exception();
-                    }
-                    //comma found
-                    else if (domains.Length >= 2)
-                    {
-                        #region processing domain split by space
-                        //convert the the string to float value as resolution U min,max domain range
-                        parametricMesh.uMinDomain = float.Parse(domains[0].Trim(' '));
-                        parametricMesh.uMaxDomain = float.Parse(domains[1].Trim(' '));
-
-                        if (domains.Length >= 4)
-                        {
-                            //convert the the string to float value as resolution V min,max domain range
-                            parametricMesh.vMinDomain = float.Parse(domains[2].Trim(' '));
-                            parametricMesh.vMaxDomain = float.Parse(domains[3].Trim(' '));
-
-                            if (domains.Length >= 6)
-                            {
-                                //convert the the string to float value as resolution W min,max domain range
-                                parametricMesh.wMinDomain = float.Parse(domains[4].Trim(' '));
-                                parametricMesh.wMaxDomain = float.Parse(domains[5].Trim(' '));
-                            }
-                        }
-                        #endregion
-                    }
-
-                    #endregion
-                }
-                else if (domains.Length >= 2)
-                {
-                    #region processing domain split by space
-                    //convert the the string to float value as resolution U min,max domain range
-                    parametricMesh.uMinDomain = float.Parse(domains[0]);
-                    parametricMesh.uMaxDomain = float.Parse(domains[1]);
+                    //Process substring one and two
+                    //convert the the string to float value as parametric U min,max domain range
+                    parametricMesh.uMinDomain = float.Parse(domains[0].Trim(' '));
+                    parametricMesh.uMaxDomain = float.Parse(domains[1].Trim(' '));
 
                     if (domains.Length >= 4)
                     {
-                        //convert the the string to float value as resolution V min,max domain range
-                        parametricMesh.vMinDomain = float.Parse(domains[2]);
-                        parametricMesh.vMaxDomain = float.Parse(domains[3]);
+                        //Process substring three and four
+                        //convert the the string to float value as parametric V min,max domain range
+                        parametricMesh.vMinDomain = float.Parse(domains[2].Trim(' '));
+                        parametricMesh.vMaxDomain = float.Parse(domains[3].Trim(' '));
 
                         if (domains.Length >= 6)
                         {
-                            //convert the the string to float value as resolution W min,max domain range
-                            parametricMesh.wMinDomain = float.Parse(domains[4]);
-                            parametricMesh.wMaxDomain = float.Parse(domains[5]);
+                            //Process substring five and six
+                            //convert the the string to float value as parametric W min,max domain range
+                            parametricMesh.wMinDomain = float.Parse(domains[4].Trim(' '));
+                            parametricMesh.wMaxDomain = float.Parse(domains[5].Trim(' '));
                         }
                     }
-                    #endregion
                 }
                 #endregion
             }
             catch
             {
-                errorMessages += "Error in Domain input format.\n";
+                errorMessages += "Error in Parametric Domain input format.\n";
             }
             try
             {
-                #region obtain and process resolution format 
-                //Accepted Formated as: [#] [# #] [# # #] 
-                //                  or  [#] [#,#] [#,#,#] 
-                //                  or  (#) (# #) (# # #)
-                //                  or  (#) (#,#) (#,#,#)
-                //                  or   #   # #   # # # 
-                //                  or   #   #,#   #,#,# 
-
+                #region Obtain Parametric u v w resolution from the tab and set into parametricmesh class 
+                //Accepted Formated as: "#" or "# #" or "# # #
                 string resolution = tab.Resolution;
-                resolution = resolution.TrimStart('[', '(', ' ').TrimEnd(']', ')', ' ');
-
                 string[] res = resolution.Split(' ');//split string by space
-                //no space found
-                if (res.Length == 1)
+                if (res.Length >= 1)
                 {
-                    #region processing resolution split by comma
-                    res = resolution.Split(',');//split string by comma
-
-                    if (res.Length >= 1)
+                    //Process substring one
+                    //convert the first part of the string to int value as resolution U
+                    parametricMesh.sampleresolution_U = int.Parse(res[0].Trim(' '));
+                    if (res.Length >= 2)
                     {
-                        //convert the the string to int value as resolution U
-                        parametricMesh.sampleresolution_U = int.Parse(res[0].Trim(' '));
-                    }
-                    else if (res.Length >= 2)
-                    {
+                        //Process substring two
                         //convert the second part of the string to int value as resolution V
                         parametricMesh.sampleresolution_V = int.Parse(res[1].Trim(' '));
                         if (res.Length >= 3)
                         {
-                            //convert the second part of the string to int value as resolution W
+                            //Process substring three
+                            //convert the third part of the string to int value as resolution W
                             parametricMesh.sampleresolution_W = int.Parse(res[2].Trim(' '));
                         }
                     }
-                    #endregion
-                }
-                else if (res.Length >= 2)
-                {
-                    #region processing resolution split by space
-                    //convert the first part of the string to int value as resolution U
-                    parametricMesh.sampleresolution_U = int.Parse(res[0].Trim(' '));
-
-                    //convert the second part of the string to int value as resolution V
-                    parametricMesh.sampleresolution_V = int.Parse(res[1].Trim(' '));
-                    if (res.Length >= 3)
-                    {
-                        //convert the second part of the string to int value as resolution W
-                        parametricMesh.sampleresolution_W = int.Parse(res[2].Trim(' '));
-                    }
-                    #endregion
                 }
                 #endregion
             }
             catch
             {
-                errorMessages += "Error in Resolution input format.\n";
+                errorMessages += "Error in Parametric Resolution input format.\n";
             }
 
-            #region check if the resolution input by user is something the device(pc,phone,mac) can support
+            #region check if the resolution that user has input is something the device(pc,phone,mac) can support
             long maximumindex = 0;
             if (SystemInfo.supports32bitsIndexBuffer)
                 maximumindex = 4000000000;
@@ -791,43 +788,22 @@ public class Main : MonoBehaviour
                 return;
             }
             #endregion
-
+            
             #endregion
         }
-        else
+        else if (tab.ObjectMode == 1)
         {
-            #region user input validation on implicit input parameters
+            #region User Input Validation on Implicit input parameters
             try
             {
-                #region obtain and process bounding box size
-                //Accepted Formated as: [# # #] , [#,#,#] 
-                //                  or  (# # #) , (#,#,#)
-                //                  or   # # #  ,  #,#,# 
-                string size = BoundingBoxSizeInputField.text;
-                size = size.TrimStart('[', '(',' ').TrimEnd(']', ')',' ');
+                #region Obtain Bounding Box Size from tab and set into parametricMesh class
+                //Accepted Formated as: # # #
+                string size = tab.MarchingBoundingBoxSize;
                 string[] sizearray = size.Split(' ');//split string by space
-                //no space found
-                if (sizearray.Length == 1)
+                if (sizearray.Length == 3)
                 {
-                    #region processing size split by comma
-                    sizearray = size.Split(',');//split string by comma
-
-                    if (sizearray.Length == 3)
-                    {
-                        parametricMesh.MarchingBoundingBoxSize = new Vector3(float.Parse(sizearray[0].Trim(' ')), float.Parse(sizearray[1].Trim(' ')), float.Parse(sizearray[2].Trim(' ')));
-                    }
-                    else
-                    {
-                        throw new Exception();
-                    }
-                    #endregion
-                }
-                //space found
-                else if (sizearray.Length == 3)
-                {
-                    #region processing resolution split by space
+                    //Convert each part of the substring to the x,y,z vector values as float value for BBoxsize
                     parametricMesh.MarchingBoundingBoxSize = new Vector3(float.Parse(sizearray[0].Trim(' ')), float.Parse(sizearray[1].Trim(' ')), float.Parse(sizearray[2].Trim(' ')));
-                    #endregion
                 }
                 else
                 {
@@ -841,35 +817,14 @@ public class Main : MonoBehaviour
             }
             try
             {
-                #region obtain and process bounding box center position
-                //Accepted Formated as: [# # #] , [#,#,#] 
-                //                  or  (# # #) , (#,#,#)
-                //                  or   # # #  ,  #,#,# 
-                string pos = BoundingBoxCenterInputField.text;
-                pos = pos.TrimStart('[', '(', ' ').TrimEnd(']', ')', ' ');
+                #region obtain bounding box center from tab and set into parametricMesh class
+                //Accepted Formated as: # # #
+                string pos = tab.MarchingBoundingBoxCenter;
                 string[] posarray = pos.Split(' ');//split string by space
-                //no space found
-                if (posarray.Length == 1)
+                if (posarray.Length == 3)
                 {
-                    #region processing size split by comma
-                    posarray = pos.Split(',');//split string by comma
-
-                    if (posarray.Length == 3)
-                    {
-                        parametricMesh.MarchingBoundingBoxCenter = new Vector3(float.Parse(posarray[0].Trim(' ')), float.Parse(posarray[1].Trim(' ')), float.Parse(posarray[2].Trim(' ')));
-                    }
-                    else
-                    {
-                        throw new Exception();
-                    }
-                    #endregion
-                }
-                //space found
-                else if (posarray.Length == 3)
-                {
-                    #region processing resolution split by space
+                    //Convert each part of the substring to the x,y,z vector values as float value for BBoxcenter
                     parametricMesh.MarchingBoundingBoxCenter = new Vector3(float.Parse(posarray[0].Trim(' ')), float.Parse(posarray[1].Trim(' ')), float.Parse(posarray[2].Trim(' ')));
-                    #endregion
                 }
                 else
                 {
@@ -883,35 +838,14 @@ public class Main : MonoBehaviour
             }
             try
             {
-                #region obtain and process bounding box resolution
-                //Accepted Formated as: [# # #] , [#,#,#] 
-                //                  or  (# # #) , (#,#,#)
-                //                  or   # # #  ,  #,#,# 
-                string res = BoundingBoxResolutionInputField.text;
-                res = res.TrimStart('[', '(', ' ').TrimEnd(']', ')', ' ');
+                #region obtain bounding box resolution from tab and set into parametricMesh class
+                //Accepted Formated as: # # #
+                string res = tab.BoundingBoxResolution;
                 string[] resarray = res.Split(' ');//split string by space
-                //no space found
-                if (resarray.Length == 1)
+                if (resarray.Length == 3)
                 {
-                    #region processing size split by comma
-                    resarray = res.Split(',');//split string by comma
-
-                    if (resarray.Length == 3)
-                    {
-                        parametricMesh.BoundingBoxResolution = new Vector3(float.Parse(resarray[0].Trim(' ')), float.Parse(resarray[1].Trim(' ')), float.Parse(resarray[2].Trim(' ')));
-                    }
-                    else
-                    {
-                        throw new Exception();
-                    }
-                    #endregion
-                }
-                //space found
-                else if (resarray.Length == 3)
-                {
-                    #region processing resolution split by space
+                    //Convert each part of the substring to the x,y,z vector values as float value for BBox resolution
                     parametricMesh.BoundingBoxResolution = new Vector3(float.Parse(resarray[0].Trim(' ')), float.Parse(resarray[1].Trim(' ')), float.Parse(resarray[2].Trim(' ')));
-                    #endregion
                 }
                 else
                 {
@@ -926,23 +860,15 @@ public class Main : MonoBehaviour
             #endregion
         }
 
-        #region diffuse check
-        //Format checking and format forcing
-        //Accepted format: (R,G,B) [R,G,B] R,G,B (#) [#] #
-        //Forced format: R,G,B where R,G,B is 0-1 value
-        string diffusetext = DiffuseColorInputField.text;
-        diffusetext = diffusetext.TrimStart('[', '(', ' ').TrimEnd(']', ')', ' ');
-        string[] diffusecolorarray = diffusetext.Split(',');
-        float diffuse_R = 0, diffuse_G = 0, diffuse_B = 0;
+        #region User Input Validation for diffuse color and obtain value to be set later
+        //Accepted format: R G B
+        //Forced R G B to be value between 0 - 1
+        string diffusetext = tab.DiffuseColor;
+        string[] diffusecolorarray = diffusetext.Split(' ');
+        float diffuse_R = 1f,diffuse_G = 1f, diffuse_B = 1f;
         try
         {
-            if (diffusecolorarray.Length == 1)
-            {
-                diffuse_R = Mathf.Clamp01(float.Parse(diffusecolorarray[0]));
-                diffuse_G = diffuse_R;
-                diffuse_B = diffuse_R;
-            }
-            else if (diffusecolorarray.Length == 3)
+            if (diffusecolorarray.Length == 3)
             {
                 diffuse_R = Mathf.Clamp01(float.Parse(diffusecolorarray[0].Trim(' ')));
                 diffuse_G = Mathf.Clamp01(float.Parse(diffusecolorarray[1].Trim(' ')));
@@ -952,31 +878,22 @@ public class Main : MonoBehaviour
             {
                 throw new Exception();
             }
-            DiffuseColorInputField.text = diffuse_R + "," + diffuse_G + "," + diffuse_B;
         }
         catch
         {
-            errorMessages += "Error in Diffuse Color input format:\"R,G,B\".\n";
+            errorMessages += "Error in Diffuse Color input format:\"R G B\".\n";
         }
         #endregion
 
-        #region specular check
-        //Format checking and format forcing
-        //Accepted format: (R,G,B) [R,G,B] R,G,B (#) [#] #
-        //Forced format: R,G,B where R,G,B is 0-1 value
-        string speculartext = SpecularColorInputField.text;
-        speculartext = speculartext.TrimStart('[', '(', ' ').TrimEnd(']', ')', ' ');
-        string[] specularcolorarray = speculartext.Split(',');
-        float specular_R = 0,specular_G = 0,specular_B = 0;
+        #region User Input Validation for specular color and obtain value to be set later
+        //Accepted format: R G B
+        //Forced R G B to be value between 0 - 1
+        string speculartext = tab.SpecularColor;
+        string[] specularcolorarray = speculartext.Split(' ');
+        float specular_R = 0.4f, specular_G = 0.1f, specular_B = 0.3f;
         try
         {
-            if (specularcolorarray.Length == 1)
-            {
-                specular_R = Mathf.Clamp01(float.Parse(specularcolorarray[0]));
-                specular_G = specular_R;
-                specular_B = specular_R;
-            }
-            else if (specularcolorarray.Length == 3)
+            if (specularcolorarray.Length == 3)
             {
                 specular_R = Mathf.Clamp01(float.Parse(specularcolorarray[0].Trim(' ')));
                 specular_G = Mathf.Clamp01(float.Parse(specularcolorarray[1].Trim(' ')));
@@ -986,25 +903,21 @@ public class Main : MonoBehaviour
             {
                 throw new Exception();
             }
-            SpecularColorInputField.text = specular_R + "," + specular_G + "," + specular_B;
         }
         catch
         {
-            errorMessages += "Error in Specular Color input format:\"R,G,B\".\n";
+            errorMessages += "Error in Specular Color input format:\"R G B\".\n";
         }
         #endregion
 
-        #region transparency check
-        //Format checking and format forcing
-        //Accepted format: (#) [#] #
-        //Forced format: # where # is 0-1 value
-        string transparency = TransparencyInputField.text;
-        transparency = transparency.TrimStart('[', '(', ' ').TrimEnd(']', ')', ' ');
-        float transparencyvalue = 1;
+        #region User Input Validation for transparency and obtain value to be set later
+        //Accepted format: #
+        //Forced # to be value between 0 - 1
+        string transparency = tab.Transparency;
+        float transparencyvalue = 0;
         try
         {
-            transparencyvalue = Mathf.Clamp01(float.Parse(transparency));
-            TransparencyInputField.text = transparencyvalue.ToString();
+            transparencyvalue = Mathf.Clamp01(float.Parse(transparency.Trim(' ')));
         }
         catch
         {
@@ -1012,17 +925,14 @@ public class Main : MonoBehaviour
         }
         #endregion
 
-        #region shininess check
-        //Format checking and format forcing
-        //Accepted format: (#) [#] #
-        //Forced format: # where # is 0-1 value
-        string text = ShininessInputField.text;
-        text = text.TrimStart('[', '(', ' ').TrimEnd(']', ')', ' ');
-        float shininess = 0.5f;
+        #region User Input Validation for shininess and obtain value to be set later
+        //Accepted format: #
+        //Forced # to be value between 0 - 1
+        string shinytext = tab.Shininess;
+        float shininess = 1f;
         try
         {
-            shininess = Mathf.Clamp01(float.Parse(text));
-            ShininessInputField.text = shininess.ToString();
+            shininess = Mathf.Clamp01(float.Parse(shinytext.Trim(' ')));
         }
         catch
         {
@@ -1030,7 +940,7 @@ public class Main : MonoBehaviour
         }
         #endregion
 
-        //stop the run if theres an error
+        //stop the run if theres any error
         if (errorMessages.Length > 0)
         {
             DisplayMessage(errorMessages.TrimEnd('\n'));
@@ -1040,17 +950,23 @@ public class Main : MonoBehaviour
         //set the code
         parametricMesh.SetFomula(tab.Code);
 
-        //set diffuse color
-        rend.material.SetColor("_Color", new Color(diffuse_R, diffuse_G, diffuse_B, transparencyvalue));
-
-        //set specular color
-        rend.material.SetColor("_SpecColor", new Color(specular_R, specular_G, specular_B, 1));
-
-        //set shininess
-        rend.material.SetFloat("_Glossiness", shininess);
-
         //set wireframe toggle
         parametricMesh.iswireframe = tab.IsWireframe;
+
+        //set the material based on if its wireframe or solid
+        if (parametricMesh.iswireframe)
+            currentObjectMeshRenderer.material = new Material(WireframeMeshObjectMaterial);
+        else
+            currentObjectMeshRenderer.material = new Material(SolidMeshObjectMaterial);
+
+        //set diffuse color
+        currentObjectMeshRenderer.material.SetColor("_Color", new Color(diffuse_R, diffuse_G, diffuse_B, 1-transparencyvalue));
+
+        //set specular color
+        currentObjectMeshRenderer.material.SetColor("_SpecColor", new Color(specular_R, specular_G, specular_B, 1));
+
+        //set shininess
+        currentObjectMeshRenderer.material.SetFloat("_Glossiness", shininess);
 
         //Destroy the old mesh if it has already been generated
         if (parametricMesh.MeshGenerated == true) //if mesh is already generated
@@ -1074,6 +990,7 @@ public class Main : MonoBehaviour
         tabtocopyto.SetText(ObjectNameInputField.text);
         tabtocopyto.gameObject.name = ObjectNameInputField.text;
 
+        tabtocopyto.Code = CodeInputField.text;
 
         tabtocopyto.ParameterDomain = ParameterDomainInputField.text;
         tabtocopyto.Resolution = ParameterResolutionInputField.text;
@@ -1081,8 +998,6 @@ public class Main : MonoBehaviour
         tabtocopyto.MarchingBoundingBoxSize = BoundingBoxSizeInputField.text;
         tabtocopyto.MarchingBoundingBoxCenter = BoundingBoxCenterInputField.text;
         tabtocopyto.BoundingBoxResolution = BoundingBoxResolutionInputField.text;
-
-        tabtocopyto.Code = CodeInputField.text;
 
         tabtocopyto.DiffuseColor = DiffuseColorInputField.text;
         tabtocopyto.SpecularColor = SpecularColorInputField.text;
@@ -1096,6 +1011,8 @@ public class Main : MonoBehaviour
         ModeInputField.value = tabtocopyfrom.ObjectMode;
         OnModeChange(ModeInputField.value);
 
+        ObjectNameInputField.text = tabtocopyfrom.ObjectName;
+
         CodeInputField.text = tabtocopyfrom.Code;
 
         ParameterResolutionInputField.text = tabtocopyfrom.Resolution;
@@ -1104,8 +1021,11 @@ public class Main : MonoBehaviour
         BoundingBoxSizeInputField.text = tabtocopyfrom.MarchingBoundingBoxSize;
         BoundingBoxCenterInputField.text = tabtocopyfrom.MarchingBoundingBoxCenter;
         BoundingBoxSizeInputField.text = tabtocopyfrom.BoundingBoxResolution;
-
-        ObjectNameInputField.text = tabtocopyfrom.ObjectName;
+        
+        DiffuseColorInputField.text = tabtocopyfrom.DiffuseColor;
+        SpecularColorInputField.text = tabtocopyfrom.SpecularColor;
+        TransparencyInputField.text = tabtocopyfrom.Transparency;
+        ShininessInputField.text = tabtocopyfrom.Shininess;
     }
     void DisplayMessage(string message)
     {

@@ -12,7 +12,7 @@
 #if UNITY_STANDARD_SIMPLE
     #include "UnityStandardCoreForwardSimple.cginc"
     VertexOutputBaseSimple vertBase (VertexInput v) { v.normal *= -1; return vertForwardBaseSimple(v); }
-	VertexOutputForwardAddSimple vertAdd(VertexInput v) { v.normal *= -1; return vertForwardAddSimple(v); }
+	VertexOutputForwardAddSimple vertAdd (VertexInput v) { v.normal *= -1; return vertForwardAddSimple(v); }
     half4 fragBase (VertexOutputBaseSimple i) : SV_Target { return fragForwardBaseSimpleInternal(i); }
     half4 fragAdd (VertexOutputForwardAddSimple i) : SV_Target { return fragForwardAddSimpleInternal(i); }
 #else

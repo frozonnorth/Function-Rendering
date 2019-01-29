@@ -65,7 +65,7 @@ public class CompliedMesh : MonoBehaviour
         marchingCube.MarchChunk(MarchingBoundingBoxCenter, (int)BoundingBoxResolution.x, MarchingBoundingBoxSize.x / BoundingBoxResolution.x);
 
         IList<Vector3> verts = marchingCube.GetVertices();
-        IList<int> indices = marchingCube.GetIndices();
+        //IList<int> indices = marchingCube.GetIndices();
 
         //A mesh in unity can only be made up of 65000 verts.
         //Need to split the verts between multiple meshes.
