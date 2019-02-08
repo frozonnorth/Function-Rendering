@@ -1,8 +1,10 @@
 # Function-Rendering
 
 How to Setup
-1. Download this project
-2. Rename the file in Asset Folder from (filename).unitypackage.txt to (filename).unitypackage file
+1. Download this entire project folder
+2. Locate a file within the Asset Folder named: "(filename).unitypackage.txt"
+3. Rename/Remove ".txt" from the file name: "(filename).unitypackage.txt" to "(filename).unitypackage"
+4. Open the project folder in unity
 
 
 
