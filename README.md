@@ -4,6 +4,21 @@ How to Setup
 1. Download this project
 2. Rename the file in Asset Folder from (filename).unitypackage.txt to (filename).unitypackage file
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 Important Stuff
 
 Class that contains and controls the whole scene: Main.cs 
