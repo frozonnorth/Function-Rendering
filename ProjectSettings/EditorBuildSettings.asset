@@ -4,17 +4,5 @@
 EditorBuildSettings:
   m_ObjectHideFlags: 0
   serializedVersion: 2
-  m_Scenes:
-  - enabled: 0
-    path: Assets/FunctionRendering/MainOldUI.unity
-    guid: 643c04646ec11d040a018e3469619d40
-  - enabled: 0
-    path: Assets/FunctionRendering/MainOldUI2.unity
-    guid: 80daf914244aebb4ba5451793f236858
-  - enabled: 0
-    path: Assets/FunctionRendering/MainNewUI.unity
-    guid: 7480268aae4101644a2d8a06e670c8e1
-  - enabled: 1
-    path: Assets/FunctionRendering/MainNewUI 2.unity
-    guid: 849b07c79bf165d46a4b7f0ff3efedc4
+  m_Scenes: []
   m_configObjects: {}
