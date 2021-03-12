@@ -1,0 +1,24 @@
+mode 1
+definition "body=min(min(min(min(min(min(min(min(min(min(x+0.6,0.6-x),y+1),0.8-y),z+0.6),0.6-z),-min(min(min(min(min(y+1,-0.8-y),x+0.6),0.6-x),0.6-z),z-0.3)),-min(min(min(min(min(y+1,-0.8-y),x+0.6),0.6-x),-0.3-z),z+0.6)),-min(min(0.1-x,x+0.1),-0.8-y)),-min(-0.8-y,x-0.4)),-min(-0.8-y,-0.4-x));
+			arm=max(max(0.2^2-(x-0.8)^2-(y-0.2)^2-z^2,0.2^2-(x+0.8)^2-(y-0.2)^2-z^2),min(min(0.3^2-(y-0.2)^2-z^2,x+0.8),0.8-x));
+			midSection=max(body,arm);
+			topConnector=min(min(0.5^2-x^2-z^2,y-0.8),0.9-y);
+			head=min(min(min(min(min(x+0.5,0.5-x),y-0.9),1.6-y),z+0.5),0.5-z);
+			lefteye=min(min(0.2^2-(y-1.3)^2-(x-0.25)^2,0.6-z),z-0.5);
+			righteye=min(min(0.2^2-(y-1.3)^2-(x+0.25)^2,0.6-z),z-0.5);
+			topSection=max(max(max(head,lefteye),righteye),topConnector);
+			leftleg=min(min(min(min(min(-0.5+z-y,-0.5-z-y),-1-y),y+1.2),x-0.1),0.5-x);
+			rightleg=min(min(min(min(min(-0.5+z-y,-0.5-z-y),-1-y),y+1.2),-0.1-x),x+0.5);
+			lowerSection=max(leftleg,rightleg);
+			final=max(max(midSection,topSection),lowerSection);
+			
+			return final;"
+bboxSize 4 4 4
+bboxCenter 0 0 0
+bboxResolution 100 100 100
+diffuseColor 1 1 1
+SpecularColor 0.4 0.1 0.3
+Transparency 0
+Shininess 1
+Timecycle 1
+Timerange 0 1
