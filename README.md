@@ -3,7 +3,6 @@ Procedurally generate a 3d model using Parametric or Implicit analytical functio
 - Parametric uses the algorithm (dont know the name) of manually creating triangle meshes as quads that joins with surrouding quads - like how you would prodecurally create a cube
 - Implicit functions uses the Marching Cube Algorithm
 - Works on Windows/Mac/Android
-- 
 --------------
 Note: A Lot of UI are just placeholders and does not work
 --------------
